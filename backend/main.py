@@ -15,10 +15,10 @@ if str(CURRENT_DIR) not in sys.path:
 load_dotenv()
 
 try:
-    from routers import indoor_temp, design, thermal_energy
+    from routers import indoor_temp, design, thermal_energy, optimization
     from services import model_loader, climate
 except ImportError:
-    from backend.routers import indoor_temp, design, thermal_energy
+    from backend.routers import indoor_temp, design, thermal_energy, optimization
     from backend.services import model_loader
     from backend.services import climate
 
@@ -92,6 +92,7 @@ def climate_data(latitude: float, longitude: float, start: str | None = None, en
 app.include_router(indoor_temp.router)
 app.include_router(design.router)
 app.include_router(thermal_energy.router)
+app.include_router(optimization.router)
 
 
 if __name__ == "__main__":
