@@ -1,20 +1,5 @@
 /**
- * lib/api.ts — Typed API client for the Cold-Climate Shelter Thermal Comfort API.
- *
- * THREE exported functions, one per endpoint:
- *   predictDesign()       → POST /predict/design
- *   predictIndoorTemp()   → POST /predict/indoor-temp
- *   predictThermalEnergy() → POST /predict/thermal-energy
- *
- * TypeScript types match the backend Pydantic schemas EXACTLY:
- *   backend/schemas/design.py
- *   backend/schemas/indoor_temp.py
- *   backend/schemas/thermal_energy.py
- *
- * Do NOT rename any field — names are identical to the training dataset columns.
- *
- * Usage (teammate's form pages):
- *   import { predictDesign, type DesignPredictionRequest } from "@/lib/api"
+ * lib/api.ts — Typed API client and client-side fallback engine for Cold-Climate Shelter Thermal Comfort.
  */
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -22,16 +7,19 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
-// ─── Shared fetch helper ──────────────────────────────────────────────────────
+// ─── Shared Fetch Helpers ─────────────────────────────────────────────────────
 
 async function apiFetch<TResponse>(
   path: string,
-  body: unknown
+  options: RequestInit = {}
 ): Promise<TResponse> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
   });
 
   if (!res.ok) {
@@ -59,192 +47,582 @@ export class ApiError extends Error {
   }
 }
 
-// ─── /predict/design ─────────────────────────────────────────────────────────
-// Source: backend/schemas/design.py :: DesignPredictionRequest / DesignPredictionResponse
+// ─── Climate Service Types ───────────────────────────────────────────────────
 
-/** Input body for POST /predict/design — matches DesignPredictionRequest exactly. */
-export interface DesignPredictionRequest {
-  /** Degrees north/south  [-90, 90] */
+export interface ClimateData {
   latitude: number;
-  /** Degrees east/west  [-180, 180] */
   longitude: number;
-  /** Ambient air temperature in °C (optional) */
+  ambient_temp_c: number;
+  wind_speed_ms: number;
+  humidity_pct: number;
+  ghi_kwh_m2_day: number;
+  rain_last_7days_mm: number;
+  source: string;
+}
+
+export async function getClimate(
+  latitude: number,
+  longitude: number
+): Promise<ClimateData> {
+  return apiFetch<ClimateData>(
+    `/climate?latitude=${latitude}&longitude=${longitude}`,
+    { method: "GET" }
+  );
+}
+
+// ─── /predict/design ─────────────────────────────────────────────────────────
+
+export interface DesignPredictionRequest {
+  latitude: number;
+  longitude: number;
   ambient_temp_c?: number | null;
-  /** Wind speed in m/s (optional, ≥0) */
   wind_speed_ms?: number | null;
-  /** Wind direction in degrees [0, 360] (optional) */
   wind_direction_deg?: number | null;
-  /** Global horizontal irradiance in kWh/m²/day (optional, ≥0) */
   ghi_kwh_m2_day?: number | null;
-  /** Warm-season relative humidity % [0, 100] (optional) */
   warm_humidity_pct?: number | null;
-  /** Hot-air index string category (optional) */
   hot_air_index?: string | null;
-  /** Rainfall in last 7 days in mm (optional, ≥0) */
   rain_last_7days_mm?: number | null;
 }
 
-/** Response from POST /predict/design — matches DesignPredictionResponse exactly. */
 export interface DesignPredictionResponse {
   status: string;
-  /** Raw JSON string of the predicted shelter material and design config */
   shelter_material_and_design: string;
-  /** Numeric material class label (parsed from shelter_material_and_design) */
   material_class?: number | null;
-  /** Window-to-wall ratio (parsed convenience field) */
   wwr?: number | null;
-  /** Wall thickness in cm (parsed convenience field) */
   wall_thickness_cm?: number | null;
-  /** Glazing ratio fraction [0, 1] (parsed convenience field) */
   glazing_ratio?: number | null;
-  /** Insulation R-value (parsed convenience field) */
   insulation_r_value?: number | null;
 }
 
-/**
- * Predict optimal shelter design for a given location and climate inputs.
- *
- * @param body - Location + optional climate inputs
- * @returns Predicted material class, WWR, wall thickness, glazing ratio, R-value
- * @throws {ApiError} on non-2xx response
- */
 export async function predictDesign(
   body: DesignPredictionRequest
 ): Promise<DesignPredictionResponse> {
-  return apiFetch<DesignPredictionResponse>("/predict/design", body);
+  return apiFetch<DesignPredictionResponse>("/predict/design", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 // ─── /predict/indoor-temp ────────────────────────────────────────────────────
-// Source: backend/schemas/indoor_temp.py :: IndoorTempRequest / IndoorTempResponse
 
-/** Input body for POST /predict/indoor-temp — matches IndoorTempRequest exactly. */
 export interface IndoorTempRequest {
-  /** Degrees north/south  [-90, 90] */
   latitude: number;
-  /** Degrees east/west  [-180, 180] */
   longitude: number;
-  /** Calendar month [1, 12] */
   month: number;
-  /** Hour of day [0, 23] */
   hour: number;
-  /** Outdoor air temperature in °C (optional) */
   outdoor_temperature_C?: number | null;
-  /** Wind speed in m/s (optional, ≥0) */
   wind_speed_mps?: number | null;
-  /** Thermal mass of shelter in MJ/(m³·K) */
   thermal_mass_MJ_m3K: number;
-  /** Insulation R-value in m²·K/W */
   insulation_r_value_m2K_W: number;
-  /** Glazing fraction [0, 1] */
   glazing: number;
-  /** Global horizontal irradiance in W/m² — auto-filled from solar service if omitted */
   GHI_W_m2?: number | null;
-  /** Shelter material string — will be label-encoded by the backend */
   best_shelter_material: string;
 }
 
-/** Response from POST /predict/indoor-temp — matches IndoorTempResponse exactly. */
 export interface IndoorTempResponse {
   status: string;
-  /** Predicted indoor temperature in °C */
   indoor_temperature_C: number;
 }
 
-/**
- * Predict indoor temperature for a shelter at a given hour and month.
- *
- * @param body - Location, time, design parameters, and climate inputs
- * @returns Predicted indoor_temperature_C in °C
- * @throws {ApiError} on non-2xx response
- */
 export async function predictIndoorTemp(
   body: IndoorTempRequest
 ): Promise<IndoorTempResponse> {
-  return apiFetch<IndoorTempResponse>("/predict/indoor-temp", body);
+  return apiFetch<IndoorTempResponse>("/predict/indoor-temp", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 // ─── /predict/thermal-energy ─────────────────────────────────────────────────
-// Source: backend/schemas/thermal_energy.py :: ThermalEnergyRequest / ThermalEnergyResponse
 
-/** Input body for POST /predict/thermal-energy — matches ThermalEnergyRequest exactly. */
 export interface ThermalEnergyRequest {
-  /** Degrees north/south  [-90, 90] */
   latitude: number;
-  /** Degrees east/west  [-180, 180] */
   longitude: number;
-  /** Hour of day [0, 23] (optional — XGBoost handles missing values) */
   hour?: number | null;
-  /** Shelter interior volume in m³ (>0) */
   shelter_volume_m3: number;
-  /** Wall material string: Stone | Rammed_Earth | Mud_Brick | Concrete */
   wall_material: string;
-  /** Wall thickness in cm (>0) */
   wall_thickness_cm: number;
-  /** Glazing ratio fraction [0, 1] */
   glazing_ratio: number;
-  /** Insulation R-value (≥0) */
   insulation_r_value: number;
-  /** Global horizontal irradiance in W/m² (optional, ≥0) */
   ghi_w_m2?: number | null;
-  /** Ambient air temperature in °C (optional) */
   ambient_temp_c?: number | null;
-  /** Thermal mass of shelter in kJ/K (optional, >0) */
   thermal_mass_kj_k?: number | null;
 }
 
-/** Response from POST /predict/thermal-energy — matches ThermalEnergyResponse exactly. */
 export interface ThermalEnergyResponse {
   status: string;
-  /** Predicted thermal energy demand in kWh */
   thermal_energy_kwh: number;
 }
 
-/**
- * Predict thermal energy (heating demand) for a shelter over one hour.
- *
- * @param body - Location, shelter geometry, material, and climate inputs
- * @returns Predicted thermal_energy_kwh
- * @throws {ApiError} on non-2xx response
- */
 export async function predictThermalEnergy(
   body: ThermalEnergyRequest
 ): Promise<ThermalEnergyResponse> {
-  return apiFetch<ThermalEnergyResponse>("/predict/thermal-energy", body);
+  return apiFetch<ThermalEnergyResponse>("/predict/thermal-energy", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
-// ─── Smoke-test block (remove before committing to production) ────────────────
-//
-// Uncomment and run in a browser console or test file to verify the backend is
-// reachable and field names are wired correctly. Requires a local backend at
-// NEXT_PUBLIC_API_URL (default http://localhost:8000) with models loaded.
-//
-// import { predictDesign, predictIndoorTemp, predictThermalEnergy } from "@/lib/api"
-//
-// async function smokeTest() {
-//   const design = await predictDesign({ latitude: 34.15, longitude: 77.57 })
-//   console.log("[smoke] /predict/design →", design)
-//
-//   const temp = await predictIndoorTemp({
-//     latitude: 34.15,
-//     longitude: 77.57,
-//     month: 1,
-//     hour: 12,
-//     thermal_mass_MJ_m3K: 2.1,
-//     insulation_r_value_m2K_W: 3.5,
-//     glazing: 0.15,
-//     best_shelter_material: "Stone",
-//   })
-//   console.log("[smoke] /predict/indoor-temp →", temp)
-//
-//   const energy = await predictThermalEnergy({
-//     latitude: 34.15,
-//     longitude: 77.57,
-//     shelter_volume_m3: 45,
-//     wall_material: "Stone",
-//     wall_thickness_cm: 40,
-//     glazing_ratio: 0.15,
-//     insulation_r_value: 3.5,
-//   })
-//   console.log("[smoke] /predict/thermal-energy →", energy)
-// }
-// smokeTest()
+// ─── Chapter 3: Optimization & Results Dashboard ──────────────────────────────
+
+export interface ShelterDesign {
+  material: "brick" | "aac" | "insulated_panel";
+  insulation_mm: number;
+  glazing: "single" | "double" | "low_e";
+  area_m2: number;
+}
+
+export interface AnalysisRequest {
+  location: string;
+  outdoor_temp_c: number;
+  solar_kwh_m2: number;
+  occupants: number;
+  target_temp_c?: number;
+  design: ShelterDesign;
+}
+
+export interface OptimizationRequest extends AnalysisRequest {
+  population_size?: number;
+  generations?: number;
+}
+
+export interface HourlyTempPoint {
+  hour: number;
+  outdoor: number;
+  indoor: number;
+}
+
+export interface ParetoPoint {
+  design: ShelterDesign;
+  daily_heating_kwh: number;
+  estimated_install_cost: number;
+}
+
+export interface AnalysisResult {
+  location: string;
+  inputs: OptimizationRequest;
+  design: ShelterDesign;
+  indoor_temperature_24h: HourlyTempPoint[];
+  thermal_energy: {
+    daily_heating_kwh: number;
+    annual_heating_kwh: number;
+  };
+  comfort: {
+    minimum_indoor_c: number;
+    hours_below_target: number;
+  };
+  cost: {
+    estimated_install_cost: number;
+  };
+}
+
+export interface DashboardResponse {
+  status: string;
+  baseline: AnalysisResult;
+  pareto_front: ParetoPoint[];
+  source?: string;
+}
+
+export async function runOptimization(
+  body: OptimizationRequest
+): Promise<DashboardResponse> {
+  return apiFetch<DashboardResponse>("/optimization/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getDashboard(
+  body: OptimizationRequest
+): Promise<DashboardResponse> {
+  return apiFetch<DashboardResponse>("/optimization/dashboard", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getGoldenCase(
+  location: string
+): Promise<{ status: string; source: string; result: AnalysisResult }> {
+  return apiFetch<{ status: string; source: string; result: AnalysisResult }>(
+    `/optimization/golden/${encodeURIComponent(location)}`,
+    { method: "GET" }
+  );
+}
+
+// ─── Client-Side Bulletproof Golden Fallback Data ─────────────────────────────
+// Guaranteed 100% offline demo resilience if the local backend server is unreachable
+
+export interface PresetLocation {
+  name: string;
+  coords: { lat: number; lon: number };
+  climate: {
+    ambient_temp_c: number;
+    wind_speed_ms: number;
+    ghi_kwh_m2_day: number;
+    humidity_pct: number;
+    hot_air_index: string;
+  };
+  indoorTempPreset: Partial<IndoorTempRequest>;
+  thermalEnergyPreset: Partial<ThermalEnergyRequest>;
+  dashboardFallback: DashboardResponse;
+}
+
+export const GOLDEN_PRESETS: Record<string, PresetLocation> = {
+  Leh: {
+    name: "Leh (Ladakh Capital)",
+    coords: { lat: 34.16, lon: 77.58 },
+    climate: {
+      ambient_temp_c: -6.0,
+      wind_speed_ms: 3.5,
+      ghi_kwh_m2_day: 5.4,
+      humidity_pct: 25.0,
+      hot_air_index: "Extreme Freeze",
+    },
+    indoorTempPreset: {
+      latitude: 34.16,
+      longitude: 77.58,
+      month: 1,
+      hour: 12,
+      outdoor_temperature_C: -6.0,
+      wind_speed_mps: 3.5,
+      thermal_mass_MJ_m3K: 2.2,
+      insulation_r_value_m2K_W: 5.2,
+      glazing: 0.25,
+      GHI_W_m2: 550,
+      best_shelter_material:
+        "Stabilized Rammed Earth + Straw-Clay cavity insulation; south Trombe wall with double low-E glazing",
+    },
+    thermalEnergyPreset: {
+      latitude: 34.16,
+      longitude: 77.58,
+      shelter_volume_m3: 120,
+      wall_material: "Rammed_Earth",
+      wall_thickness_cm: 45,
+      glazing_ratio: 0.25,
+      insulation_r_value: 5.2,
+      ghi_w_m2: 550,
+      ambient_temp_c: -6.0,
+      thermal_mass_kj_k: 12500,
+    },
+    dashboardFallback: {
+      status: "fallback",
+      source: "client-offline-cache",
+      baseline: {
+        location: "Leh",
+        inputs: {
+          location: "Leh",
+          outdoor_temp_c: -6.0,
+          solar_kwh_m2: 5.4,
+          occupants: 4,
+          target_temp_c: 21.0,
+          design: {
+            material: "insulated_panel",
+            insulation_mm: 150,
+            glazing: "low_e",
+            area_m2: 85,
+          },
+        },
+        design: {
+          material: "insulated_panel",
+          insulation_mm: 150,
+          glazing: "low_e",
+          area_m2: 85,
+        },
+        indoor_temperature_24h: [
+          { hour: 0, outdoor: -9.5, indoor: 17.6 },
+          { hour: 1, outdoor: -9.8, indoor: 17.4 },
+          { hour: 2, outdoor: -10.0, indoor: 17.3 },
+          { hour: 3, outdoor: -9.8, indoor: 17.2 },
+          { hour: 4, outdoor: -9.5, indoor: 17.1 },
+          { hour: 5, outdoor: -8.8, indoor: 17.2 },
+          { hour: 6, outdoor: -8.0, indoor: 17.5 },
+          { hour: 7, outdoor: -7.0, indoor: 18.0 },
+          { hour: 8, outdoor: -6.0, indoor: 18.6 },
+          { hour: 9, outdoor: -5.0, indoor: 19.4 },
+          { hour: 10, outdoor: -4.0, indoor: 20.2 },
+          { hour: 11, outdoor: -3.0, indoor: 20.8 },
+          { hour: 12, outdoor: -2.0, indoor: 21.2 },
+          { hour: 13, outdoor: -2.2, indoor: 21.1 },
+          { hour: 14, outdoor: -2.8, indoor: 20.7 },
+          { hour: 15, outdoor: -3.8, indoor: 20.1 },
+          { hour: 16, outdoor: -5.0, indoor: 19.5 },
+          { hour: 17, outdoor: -6.2, indoor: 18.9 },
+          { hour: 18, outdoor: -7.2, indoor: 18.4 },
+          { hour: 19, outdoor: -8.0, indoor: 18.1 },
+          { hour: 20, outdoor: -8.6, indoor: 17.9 },
+          { hour: 21, outdoor: -9.0, indoor: 17.8 },
+          { hour: 22, outdoor: -9.2, indoor: 17.7 },
+          { hour: 23, outdoor: -9.4, indoor: 17.6 },
+        ],
+        thermal_energy: {
+          daily_heating_kwh: 16.8,
+          annual_heating_kwh: 2016,
+        },
+        comfort: {
+          minimum_indoor_c: 17.1,
+          hours_below_target: 17,
+        },
+        cost: {
+          estimated_install_cost: 14780.0,
+        },
+      },
+      pareto_front: [
+        {
+          design: { material: "brick", insulation_mm: 50, glazing: "single", area_m2: 85 },
+          daily_heating_kwh: 84.5,
+          estimated_install_cost: 6520.0,
+        },
+        {
+          design: { material: "aac", insulation_mm: 90, glazing: "double", area_m2: 85 },
+          daily_heating_kwh: 36.2,
+          estimated_install_cost: 9840.0,
+        },
+        {
+          design: { material: "insulated_panel", insulation_mm: 120, glazing: "double", area_m2: 85 },
+          daily_heating_kwh: 22.1,
+          estimated_install_cost: 12950.0,
+        },
+        {
+          design: { material: "insulated_panel", insulation_mm: 160, glazing: "low_e", area_m2: 85 },
+          daily_heating_kwh: 15.4,
+          estimated_install_cost: 15640.0,
+        },
+      ],
+    },
+  },
+  Dras: {
+    name: "Dras (Coldest Inhabited Place in India)",
+    coords: { lat: 34.43, lon: 75.76 },
+    climate: {
+      ambient_temp_c: -14.0,
+      wind_speed_ms: 4.8,
+      ghi_kwh_m2_day: 4.8,
+      humidity_pct: 35.0,
+      hot_air_index: "Extreme Freeze",
+    },
+    indoorTempPreset: {
+      latitude: 34.43,
+      longitude: 75.76,
+      month: 1,
+      hour: 12,
+      outdoor_temperature_C: -14.0,
+      wind_speed_mps: 4.8,
+      thermal_mass_MJ_m3K: 2.5,
+      insulation_r_value_m2K_W: 6.2,
+      glazing: 0.2,
+      GHI_W_m2: 480,
+      best_shelter_material:
+        "Super-insulated Rammed Earth (straw/clay cavity) + unvented Trombe wall & insulated thermal shutter",
+    },
+    thermalEnergyPreset: {
+      latitude: 34.43,
+      longitude: 75.76,
+      shelter_volume_m3: 100,
+      wall_material: "Concrete",
+      wall_thickness_cm: 50,
+      glazing_ratio: 0.2,
+      insulation_r_value: 6.2,
+      ghi_w_m2: 480,
+      ambient_temp_c: -14.0,
+      thermal_mass_kj_k: 14000,
+    },
+    dashboardFallback: {
+      status: "fallback",
+      source: "client-offline-cache",
+      baseline: {
+        location: "Dras",
+        inputs: {
+          location: "Dras",
+          outdoor_temp_c: -14.0,
+          solar_kwh_m2: 4.8,
+          occupants: 4,
+          target_temp_c: 21.0,
+          design: {
+            material: "insulated_panel",
+            insulation_mm: 200,
+            glazing: "low_e",
+            area_m2: 75,
+          },
+        },
+        design: {
+          material: "insulated_panel",
+          insulation_mm: 200,
+          glazing: "low_e",
+          area_m2: 75,
+        },
+        indoor_temperature_24h: [
+          { hour: 0, outdoor: -17.5, indoor: 16.4 },
+          { hour: 1, outdoor: -17.8, indoor: 16.2 },
+          { hour: 2, outdoor: -18.0, indoor: 16.0 },
+          { hour: 3, outdoor: -17.8, indoor: 15.9 },
+          { hour: 4, outdoor: -17.5, indoor: 15.8 },
+          { hour: 5, outdoor: -16.8, indoor: 15.9 },
+          { hour: 6, outdoor: -16.0, indoor: 16.2 },
+          { hour: 7, outdoor: -15.0, indoor: 16.8 },
+          { hour: 8, outdoor: -14.0, indoor: 17.5 },
+          { hour: 9, outdoor: -13.0, indoor: 18.4 },
+          { hour: 10, outdoor: -12.0, indoor: 19.3 },
+          { hour: 11, outdoor: -11.0, indoor: 20.0 },
+          { hour: 12, outdoor: -10.0, indoor: 20.5 },
+          { hour: 13, outdoor: -10.2, indoor: 20.3 },
+          { hour: 14, outdoor: -10.8, indoor: 19.8 },
+          { hour: 15, outdoor: -11.8, indoor: 19.2 },
+          { hour: 16, outdoor: -13.0, indoor: 18.5 },
+          { hour: 17, outdoor: -14.2, indoor: 17.9 },
+          { hour: 18, outdoor: -15.2, indoor: 17.4 },
+          { hour: 19, outdoor: -16.0, indoor: 17.1 },
+          { hour: 20, outdoor: -16.6, indoor: 16.9 },
+          { hour: 21, outdoor: -17.0, indoor: 16.7 },
+          { hour: 22, outdoor: -17.2, indoor: 16.6 },
+          { hour: 23, outdoor: -17.4, indoor: 16.5 },
+        ],
+        thermal_energy: {
+          daily_heating_kwh: 24.5,
+          annual_heating_kwh: 2940,
+        },
+        comfort: {
+          minimum_indoor_c: 15.8,
+          hours_below_target: 20,
+        },
+        cost: {
+          estimated_install_cost: 16850.0,
+        },
+      },
+      pareto_front: [
+        {
+          design: { material: "aac", insulation_mm: 100, glazing: "double", area_m2: 75 },
+          daily_heating_kwh: 58.4,
+          estimated_install_cost: 9200.0,
+        },
+        {
+          design: { material: "insulated_panel", insulation_mm: 150, glazing: "double", area_m2: 75 },
+          daily_heating_kwh: 34.2,
+          estimated_install_cost: 13800.0,
+        },
+        {
+          design: { material: "insulated_panel", insulation_mm: 200, glazing: "low_e", area_m2: 75 },
+          daily_heating_kwh: 23.8,
+          estimated_install_cost: 17400.0,
+        },
+      ],
+    },
+  },
+  Kargil: {
+    name: "Kargil (Suru River Valley)",
+    coords: { lat: 34.55, lon: 76.13 },
+    climate: {
+      ambient_temp_c: -8.0,
+      wind_speed_ms: 3.2,
+      ghi_kwh_m2_day: 5.1,
+      humidity_pct: 28.0,
+      hot_air_index: "Extreme Freeze",
+    },
+    indoorTempPreset: {
+      latitude: 34.55,
+      longitude: 76.13,
+      month: 1,
+      hour: 12,
+      outdoor_temperature_C: -8.0,
+      wind_speed_mps: 3.2,
+      thermal_mass_MJ_m3K: 2.0,
+      insulation_r_value_m2K_W: 4.8,
+      glazing: 0.22,
+      GHI_W_m2: 520,
+      best_shelter_material:
+        "Sun-dried adobe bricks with 10cm straw-clay exterior jacket insulation and direct solar-gain south windows",
+    },
+    thermalEnergyPreset: {
+      latitude: 34.55,
+      longitude: 76.13,
+      shelter_volume_m3: 110,
+      wall_material: "Mud_Brick",
+      wall_thickness_cm: 42,
+      glazing_ratio: 0.22,
+      insulation_r_value: 4.8,
+      ghi_w_m2: 520,
+      ambient_temp_c: -8.0,
+      thermal_mass_kj_k: 11200,
+    },
+    dashboardFallback: {
+      status: "fallback",
+      source: "client-offline-cache",
+      baseline: {
+        location: "Kargil",
+        inputs: {
+          location: "Kargil",
+          outdoor_temp_c: -8.0,
+          solar_kwh_m2: 5.1,
+          occupants: 3,
+          target_temp_c: 21.0,
+          design: {
+            material: "aac",
+            insulation_mm: 120,
+            glazing: "double",
+            area_m2: 80,
+          },
+        },
+        design: {
+          material: "aac",
+          insulation_mm: 120,
+          glazing: "double",
+          area_m2: 80,
+        },
+        indoor_temperature_24h: [
+          { hour: 0, outdoor: -11.5, indoor: 17.0 },
+          { hour: 1, outdoor: -11.8, indoor: 16.8 },
+          { hour: 2, outdoor: -12.0, indoor: 16.7 },
+          { hour: 3, outdoor: -11.8, indoor: 16.6 },
+          { hour: 4, outdoor: -11.5, indoor: 16.5 },
+          { hour: 5, outdoor: -10.8, indoor: 16.6 },
+          { hour: 6, outdoor: -10.0, indoor: 16.9 },
+          { hour: 7, outdoor: -9.0, indoor: 17.5 },
+          { hour: 8, outdoor: -8.0, indoor: 18.2 },
+          { hour: 9, outdoor: -7.0, indoor: 19.0 },
+          { hour: 10, outdoor: -6.0, indoor: 19.8 },
+          { hour: 11, outdoor: -5.0, indoor: 20.4 },
+          { hour: 12, outdoor: -4.0, indoor: 20.9 },
+          { hour: 13, outdoor: -4.2, indoor: 20.7 },
+          { hour: 14, outdoor: -4.8, indoor: 20.3 },
+          { hour: 15, outdoor: -5.8, indoor: 19.7 },
+          { hour: 16, outdoor: -7.0, indoor: 19.0 },
+          { hour: 17, outdoor: -8.2, indoor: 18.4 },
+          { hour: 18, outdoor: -9.2, indoor: 17.9 },
+          { hour: 19, outdoor: -10.0, indoor: 17.6 },
+          { hour: 20, outdoor: -10.6, indoor: 17.3 },
+          { hour: 21, outdoor: -11.0, indoor: 17.2 },
+          { hour: 22, outdoor: -11.2, indoor: 17.1 },
+          { hour: 23, outdoor: -11.4, indoor: 17.0 },
+        ],
+        thermal_energy: {
+          daily_heating_kwh: 19.8,
+          annual_heating_kwh: 2376,
+        },
+        comfort: {
+          minimum_indoor_c: 16.5,
+          hours_below_target: 18,
+        },
+        cost: {
+          estimated_install_cost: 11400.0,
+        },
+      },
+      pareto_front: [
+        {
+          design: { material: "brick", insulation_mm: 60, glazing: "single", area_m2: 80 },
+          daily_heating_kwh: 72.0,
+          estimated_install_cost: 6200.0,
+        },
+        {
+          design: { material: "aac", insulation_mm: 100, glazing: "double", area_m2: 80 },
+          daily_heating_kwh: 29.5,
+          estimated_install_cost: 10100.0,
+        },
+        {
+          design: { material: "insulated_panel", insulation_mm: 140, glazing: "low_e", area_m2: 80 },
+          daily_heating_kwh: 17.2,
+          estimated_install_cost: 14200.0,
+        },
+      ],
+    },
+  },
+};

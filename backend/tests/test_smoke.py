@@ -147,3 +147,119 @@ def test_thermal_energy_predict(client):
     print(f"\n{'='*50}")
     print(f"[Thermal Energy] Input: {json.dumps(payload, indent=2)}")
     print(f"[Thermal Energy] thermal_energy_kwh: {energy}")
+
+
+def test_indoor_temp_climate_autofill(client):
+    """Verify that omitting climate parameters uses the climate service without NameError."""
+    payload = {
+        "latitude": 34.16,
+        "longitude": 77.58,
+        "month": 1,
+        "hour": 12,
+        "outdoor_temperature_C": None,
+        "wind_speed_mps": None,
+        "thermal_mass_MJ_m3K": 1.8,
+        "insulation_r_value_m2K_W": 3.0,
+        "glazing": 0.25,
+        "GHI_W_m2": None,
+        "best_shelter_material": _get_valid_shelter_material(),
+    }
+    response = client.post("/predict/indoor-temp", json=payload)
+    assert response.status_code == 200, f"Autofill failed: {response.text}"
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "indoor_temperature_C" in data
+
+
+def test_thermal_energy_climate_autofill(client):
+    """Verify that omitting ambient temp and GHI uses climate service without NameError."""
+    payload = {
+        "latitude": 34.16,
+        "longitude": 77.58,
+        "shelter_volume_m3": 100.0,
+        "wall_material": _get_valid_wall_material(),
+        "wall_thickness_cm": 30.0,
+        "glazing_ratio": 0.25,
+        "insulation_r_value": 3.0,
+        "ghi_w_m2": None,
+        "ambient_temp_c": None,
+    }
+    response = client.post("/predict/thermal-energy", json=payload)
+    assert response.status_code == 200, f"Autofill failed: {response.text}"
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "thermal_energy_kwh" in data
+
+
+def test_climate_endpoint(client):
+    """Verify /climate endpoint returns climate parameters for Ladakh coordinates."""
+    response = client.get("/climate?latitude=34.16&longitude=77.58")
+    assert response.status_code == 200
+    data = response.json()
+    assert "ambient_temp_c" in data
+    assert "wind_speed_ms" in data
+    assert "ghi_kwh_m2_day" in data
+    assert "humidity_pct" in data
+
+
+def test_optimization_run(client):
+    """Verify NSGA-II / Pareto optimization endpoint returns Pareto-optimal points."""
+    payload = {
+        "location": "Leh",
+        "outdoor_temp_c": -6.0,
+        "solar_kwh_m2": 5.4,
+        "occupants": 4,
+        "target_temp_c": 21.0,
+        "design": {
+            "material": "insulated_panel",
+            "insulation_mm": 100.0,
+            "glazing": "double",
+            "area_m2": 90.0,
+        },
+        "population_size": 20,
+        "generations": 10,
+    }
+    response = client.post("/optimization/run", json=payload)
+    assert response.status_code == 200, f"Optimization run failed: {response.text}"
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "baseline" in data
+    assert "pareto_front" in data
+    assert len(data["pareto_front"]) > 0
+
+
+def test_optimization_dashboard(client):
+    """Verify unified /optimization/dashboard endpoint."""
+    payload = {
+        "location": "Leh",
+        "outdoor_temp_c": -6.0,
+        "solar_kwh_m2": 5.4,
+        "occupants": 4,
+        "target_temp_c": 21.0,
+        "design": {
+            "material": "insulated_panel",
+            "insulation_mm": 100.0,
+            "glazing": "double",
+            "area_m2": 90.0,
+        },
+        "population_size": 20,
+        "generations": 10,
+    }
+    response = client.post("/optimization/dashboard", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "baseline" in data
+    assert "pareto_front" in data
+    assert "indoor_temperature_24h" in data["baseline"]
+    assert len(data["baseline"]["indoor_temperature_24h"]) == 24
+
+
+def test_golden_case(client):
+    """Verify /optimization/golden/Leh endpoint."""
+    response = client.get("/optimization/golden/Leh")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "fallback"
+    assert data["result"]["location"] == "Leh"
+

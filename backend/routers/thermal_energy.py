@@ -18,13 +18,13 @@ try:
         ThermalEnergyRequest,
         ThermalEnergyResponse,
     )
-    from services import model_loader, solar
+    from services import model_loader, solar, climate
 except ImportError:
     from backend.schemas.thermal_energy import (
         ThermalEnergyRequest,
         ThermalEnergyResponse,
     )
-    from backend.services import model_loader, solar
+    from backend.services import model_loader, solar, climate
 
 router = APIRouter(tags=["Thermal Energy"])
 

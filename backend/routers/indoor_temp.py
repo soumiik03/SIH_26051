@@ -13,13 +13,13 @@ import pandas as pd
 
 try:
     from schemas.indoor_temp import IndoorTempRequest, IndoorTempResponse
-    from services import model_loader, solar
+    from services import model_loader, solar, climate
 except ImportError:
     from backend.schemas.indoor_temp import (
         IndoorTempRequest,
         IndoorTempResponse,
     )
-    from backend.services import model_loader, solar
+    from backend.services import model_loader, solar, climate
 
 router = APIRouter(tags=["Indoor Temperature"])
 
