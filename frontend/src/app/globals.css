@@ -10,6 +10,8 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
+  /* Expose monospace as a Tailwind font utility */
+  --font-data: var(--font-mono);
 
   /* Semantic color tokens */
   --color-success: var(--success);
@@ -161,5 +163,14 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Utility alias — apply to any numeric/data value element */
+@layer utilities {
+  .data-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 }
