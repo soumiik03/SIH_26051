@@ -1,5 +1,7 @@
 import os
 import sys
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -14,13 +16,36 @@ load_dotenv()
 
 try:
     from routers import indoor_temp, design, thermal_energy
+    from services import model_loader, climate
 except ImportError:
     from backend.routers import indoor_temp, design, thermal_energy
+    from backend.services import model_loader
+    from backend.services import climate
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """Load all ML models into memory at startup — not per-request."""
+    logger.info("Loading ML model artifacts...")
+    try:
+        model_loader.load_all()
+        logger.info("All models loaded successfully.")
+    except FileNotFoundError as e:
+        logger.error("Model loading failed: %s", e)
+        logger.error(
+            "Run 'python scripts/export_models.py' to generate model artifacts."
+        )
+    yield
+
 
 app = FastAPI(
     title="Cold-Climate Shelter Thermal Comfort API",
     description="Microservice backend for passive shelter thermal comfort design & optimization (Ladakh region).",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS configuration
@@ -39,12 +64,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Health endpoint
 @app.get("/health", tags=["System"])
 def health_check():
-    return {"status": "ok"}
+    ready = model_loader.is_ready()
+    return {"status": "ok" if ready else "degraded", "models_loaded": ready}
 
-# Mount prediction routers (stubs for Chapter 1)
+
+@app.get("/climate", tags=["Climate Data"])
+def climate_data(latitude: float, longitude: float, start: str | None = None, end: str | None = None):
+    """Return cached/retrieved NASA POWER climate values for a location."""
+    from datetime import date
+    from fastapi import HTTPException
+
+    try:
+        result = climate.get_climate(
+            latitude, longitude,
+            date.fromisoformat(start) if start else None,
+            date.fromisoformat(end) if end else None,
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return result.__dict__
+
+# Mount prediction routers
 app.include_router(indoor_temp.router)
 app.include_router(design.router)
 app.include_router(thermal_energy.router)

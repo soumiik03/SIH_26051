@@ -98,6 +98,18 @@ The backend will be live at:
 - **Interactive Swagger Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
 
+Chapter 1 prediction routes:
+
+- `POST /predict/design`
+- `POST /predict/indoor-temp`
+- `POST /predict/thermal-energy`
+- `GET /climate?latitude=34.16&longitude=77.58` (cached NASA POWER data)
+
+The legacy `/design/predict`, `/indoor-temp/predict`, and
+`/thermal-energy/predict` routes remain available for compatibility. Run the
+pre-demo smoke check from the project root with
+`.venv/Scripts/python -m pytest backend/tests/test_smoke.py -q`.
+
 ---
 
 ### 2. Frontend (Next.js 15 App)

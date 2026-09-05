@@ -1,0 +1,97 @@
+{
+  "design": {
+    "model_file": "design_model.joblib",
+    "scaler_file": "design_scaler.joblib",
+    "le_hot_air_file": "design_label_encoder_hot_air.joblib",
+    "le_target_file": "design_label_encoder_target.joblib",
+    "features": [
+      "latitude",
+      "longitude",
+      "ambient_temp_c",
+      "wind_speed_ms",
+      "wind_direction_deg",
+      "ghi_kwh_m2_day",
+      "warm_humidity_pct",
+      "hot_air_index",
+      "rain_last_7days_mm"
+    ],
+    "target": "shelter_material_and_design",
+    "target_classes": [
+      "{\"material_class\": 0, \"wwr\": 0.18, \"wall_thickness_cm\": 50, \"glazing_ratio\": 0.72, \"insulation_r_value\": 5.2}",
+      "{\"material_class\": 1, \"wwr\": 0.15, \"wall_thickness_cm\": 55, \"glazing_ratio\": 0.78, \"insulation_r_value\": 6.2}",
+      "{\"material_class\": 2, \"wwr\": 0.2, \"wall_thickness_cm\": 45, \"glazing_ratio\": 0.65, \"insulation_r_value\": 4.4}",
+      "{\"material_class\": 3, \"wwr\": 0.22, \"wall_thickness_cm\": 42, \"glazing_ratio\": 0.58, \"insulation_r_value\": 3.8}",
+      "{\"material_class\": 4, \"wwr\": 0.2, \"wall_thickness_cm\": 40, \"glazing_ratio\": 0.5, \"insulation_r_value\": 3.5}"
+    ],
+    "hot_air_index_classes": [
+      "Extreme Freeze",
+      "High",
+      "Low",
+      "Moderate",
+      "Very Low"
+    ],
+    "accuracy": 0.9935,
+    "model_type": "XGBClassifier",
+    "scaled_feature": "ambient_temp_c",
+    "encoded_feature": "hot_air_index"
+  },
+  "indoor_temp": {
+    "model_file": "indoor_temp_model.joblib",
+    "scaler_file": "indoor_temp_scaler.joblib",
+    "le_file": "indoor_temp_label_encoder.joblib",
+    "features": [
+      "latitude",
+      "longitude",
+      "month",
+      "hour",
+      "outdoor_temperature_C",
+      "wind_speed_mps",
+      "thermal_mass_MJ_m3K",
+      "insulation_r_value_m2K_W",
+      "glazing",
+      "GHI_W_m2",
+      "best_shelter_material"
+    ],
+    "target": "indoor_temperature_C",
+    "material_classes": [
+      "High-thermal-mass adobe walls with deep window overhangs for shading; active night-purge cross ventilation",
+      "Rammed earth thermal mass with adjustable cross-ventilation flaps and external fabric solar shading",
+      "Stabilized Rammed Earth + Straw-Clay cavity insulation; south Trombe wall with double low-E glazing",
+      "Sun-dried adobe bricks with 10cm straw-clay exterior jacket insulation and direct solar-gain south windows",
+      "Super-insulated Rammed Earth (straw/clay cavity) + unvented Trombe wall & insulated thermal shutter"
+    ],
+    "r2_score": 0.993,
+    "model_type": "XGBRegressor",
+    "scaled_feature": "outdoor_temperature_C",
+    "encoded_feature": "best_shelter_material"
+  },
+  "thermal_energy": {
+    "model_file": "thermal_energy_model.joblib",
+    "scaler_file": "thermal_energy_scaler.joblib",
+    "le_file": "thermal_energy_label_encoder.joblib",
+    "features": [
+      "latitude",
+      "longitude",
+      "hour",
+      "shelter_volume_m3",
+      "wall_material",
+      "wall_thickness_cm",
+      "glazing_ratio",
+      "insulation_r_value",
+      "ghi_w_m2",
+      "ambient_temp_c",
+      "thermal_mass_kj_k"
+    ],
+    "target": "thermal_energy_kwh",
+    "material_classes": [
+      "Concrete",
+      "Mud_Brick",
+      "Rammed_Earth",
+      "Stone"
+    ],
+    "r2_score": 0.9982,
+    "model_type": "XGBRegressor",
+    "scaled_feature": "ambient_temp_c",
+    "encoded_feature": "wall_material"
+  }
+}
