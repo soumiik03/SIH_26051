@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Thermometer, Building2, Zap, ArrowRight, MapPin } from "lucide-react";
+import { Thermometer, Building2, Zap, ChartNoAxesCombined, ArrowRight, MapPin } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -64,6 +64,9 @@ const THERMAL_ENERGY_INPUTS = [
 ];
 
 const THERMAL_ENERGY_OUTPUTS = ["thermal_energy_kwh"];
+
+const DASHBOARD_INPUTS = ["location", "outdoor_temp_c", "design"];
+const DASHBOARD_OUTPUTS = ["24h indoor temperature", "Pareto front", "PDF report"];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -194,7 +197,7 @@ export default function Home() {
           Prediction Tools
         </p>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <ToolCard
             href="/indoor-temp"
             icon={<Thermometer size={18} />}
@@ -220,6 +223,15 @@ export default function Home() {
             description="Estimate hourly heating demand (kWh) for a shelter volume given its construction materials and climate conditions."
             inputs={THERMAL_ENERGY_INPUTS}
             outputs={THERMAL_ENERGY_OUTPUTS}
+          />
+
+          <ToolCard
+            href="/dashboard"
+            icon={<ChartNoAxesCombined size={18} />}
+            title="Results Dashboard"
+            description="Compare comfort, heating demand, cost, and NSGA-II Pareto-optimal design trade-offs in one judge-ready view."
+            inputs={DASHBOARD_INPUTS}
+            outputs={DASHBOARD_OUTPUTS}
           />
         </div>
       </main>
