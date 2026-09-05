@@ -22,7 +22,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 
 type FormState = {
   latitude: string
@@ -173,7 +172,8 @@ export default function IndoorTemperaturePage() {
             ...prev,
             outdoor_temperature_C: String(climate.ambient_temp_c),
             wind_speed_mps: String(climate.wind_speed_ms),
-            GHI_W_m2: String(Math.round((climate.ghi_kwh_m2_day * 1000) / 6)),
+            // Let the backend pvlib solar engine fill GHI for the selected hour.
+            GHI_W_m2: "",
           }))
           setClimateSynced(true)
         } catch {
@@ -182,7 +182,7 @@ export default function IndoorTemperaturePage() {
           setLocationLoading(false)
         }
       },
-      (locationError) => {
+      () => {
         setLocationLoading(false)
         setError("Unable to retrieve GPS coordinates. You can select a golden preset above.")
       },
@@ -190,51 +190,63 @@ export default function IndoorTemperaturePage() {
     )
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function handleSubmit(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
     setError("")
     setResult(null)
 
-    if (
-      !form.latitude ||
-      !form.longitude ||
-      !form.month ||
-      !form.hour ||
-      !form.thermal_mass_MJ_m3K ||
-      !form.insulation_r_value_m2K_W ||
-      !form.glazing ||
-      !form.best_shelter_material
-    ) {
-      setError("Please fill in all required fields.")
+    const latitude = Number(form.latitude)
+    const longitude = Number(form.longitude)
+    const month = Number(form.month)
+    const hour = Number(form.hour)
+    const thermalMass = Number(form.thermal_mass_MJ_m3K)
+    const insulation = Number(form.insulation_r_value_m2K_W)
+    const glazing = Number(form.glazing)
+    const outdoor = optionalNumber(form.outdoor_temperature_C)
+    const wind = optionalNumber(form.wind_speed_mps)
+    const ghi = optionalNumber(form.GHI_W_m2)
+
+    if (!form.latitude || !form.longitude || !form.month || !form.hour || !form.thermal_mass_MJ_m3K || !form.insulation_r_value_m2K_W || !form.glazing || !form.best_shelter_material) {
+      setError("Please complete all required fields before running the model.")
+      return
+    }
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      setError("Enter a valid latitude (-90 to 90) and longitude (-180 to 180).")
+      return
+    }
+    if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(hour) || hour < 0 || hour > 23) {
+      setError("Choose a valid month and hour.")
+      return
+    }
+    if (!Number.isFinite(thermalMass) || thermalMass <= 0 || !Number.isFinite(insulation) || insulation < 0 || !Number.isFinite(glazing) || glazing < 0 || glazing > 1) {
+      setError("Check the envelope values: thermal mass must be positive, insulation non-negative, and glazing must be between 0 and 1.")
+      return
+    }
+    if ((outdoor !== undefined && !Number.isFinite(outdoor)) || (wind !== undefined && (!Number.isFinite(wind) || wind < 0)) || (ghi !== undefined && (!Number.isFinite(ghi) || ghi < 0))) {
+      setError("Check the climate values: wind speed and GHI cannot be negative.")
       return
     }
 
     const request: IndoorTempRequest = {
-      latitude: Number(form.latitude),
-      longitude: Number(form.longitude),
-      month: Number(form.month),
-      hour: Number(form.hour),
-      thermal_mass_MJ_m3K: Number(form.thermal_mass_MJ_m3K),
-      insulation_r_value_m2K_W: Number(form.insulation_r_value_m2K_W),
-      glazing: Number(form.glazing),
+      latitude,
+      longitude,
+      month,
+      hour,
+      thermal_mass_MJ_m3K: thermalMass,
+      insulation_r_value_m2K_W: insulation,
+      glazing,
       best_shelter_material: form.best_shelter_material,
-      outdoor_temperature_C: optionalNumber(form.outdoor_temperature_C),
-      wind_speed_mps: optionalNumber(form.wind_speed_mps),
-      GHI_W_m2: optionalNumber(form.GHI_W_m2),
+      outdoor_temperature_C: outdoor,
+      wind_speed_mps: wind,
+      GHI_W_m2: ghi,
     }
 
     try {
       setLoading(true)
       const response = await predictIndoorTemp(request)
       setResult(response.indoor_temperature_C)
-    } catch {
-      // Robust offline fallback if local backend is offline during demo
-      const outdoor = optionalNumber(form.outdoor_temperature_C) ?? -6.0
-      const rVal = Number(form.insulation_r_value_m2K_W)
-      const retention = Math.min(0.85, 0.45 + rVal * 0.06)
-      const solarBoost = (optionalNumber(form.GHI_W_m2) ?? 400) * 0.008
-      const estimated = Math.round((outdoor + (21.0 - outdoor) * retention + solarBoost) * 10) / 10
-      setResult(estimated)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Prediction failed. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -354,24 +366,26 @@ export default function IndoorTemperaturePage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Month (1-12)" required>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="12"
-                      className="font-mono text-sm"
+                    <select
+                      className="w-full rounded-none border border-input bg-background px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
                       value={form.month}
                       onChange={(e) => updateField("month", e.target.value)}
-                    />
+                    >
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                        <option key={month} value={month}>{month}</option>
+                      ))}
+                    </select>
                   </Field>
                   <Field label="Hour of Day (0-23)" required>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="23"
-                      className="font-mono text-sm"
+                    <select
+                      className="w-full rounded-none border border-input bg-background px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
                       value={form.hour}
                       onChange={(e) => updateField("hour", e.target.value)}
-                    />
+                    >
+                      {Array.from({ length: 24 }, (_, hour) => (
+                        <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>
+                      ))}
+                    </select>
                   </Field>
                 </div>
               </div>
@@ -475,6 +489,9 @@ export default function IndoorTemperaturePage() {
                 <div className="flex items-center gap-2 border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{error}</span>
+                  <Button type="button" variant="outline" size="xs" className="ml-auto" onClick={() => void handleSubmit()} disabled={loading}>
+                    Retry
+                  </Button>
                 </div>
               )}
 
@@ -563,6 +580,9 @@ export default function IndoorTemperaturePage() {
                   </div>
 
                   <div className="border-t border-border pt-4 text-center">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setResult(null)}>
+                      Edit inputs / try another location
+                    </Button>
                     <Link
                       href={`/dashboard?location=${encodeURIComponent(activePreset)}&outdoor_temp_c=${form.outdoor_temperature_C}`}
                       className="inline-flex items-center gap-1.5 text-xs font-mono text-accent hover:underline"

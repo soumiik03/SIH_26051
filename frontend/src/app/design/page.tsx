@@ -11,19 +11,15 @@ import {
   CheckCircle2,
   Sparkles,
   CloudSun,
-  SlidersHorizontal,
 } from "lucide-react"
 
 import {
-  predictDesign,
   getClimate,
   GOLDEN_PRESETS,
-  type DesignPredictionRequest,
-  type DesignPredictionResponse,
 } from "@/lib/api"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { predictDesign, withWallMaterial, type DesignPredictionRequest, type DesignResult } from "@/lib/api/design"
+import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 
 type FormState = {
@@ -70,7 +66,7 @@ export default function DesignPage() {
   const [error, setError] = useState("")
   const [activePreset, setActivePreset] = useState<string>("Leh")
 
-  const [prediction, setPrediction] = useState<DesignPredictionResponse | null>(null)
+  const [prediction, setPrediction] = useState<DesignResult | null>(null)
 
   function updateField(field: keyof FormState, value: string) {
     setForm((previous) => ({
@@ -136,7 +132,7 @@ export default function DesignPage() {
           setLocationLoading(false)
         }
       },
-      (locationError) => {
+      () => {
         setLocationLoading(false)
         setError("Unable to retrieve GPS coordinates. You can select a golden preset above.")
       },
@@ -144,70 +140,65 @@ export default function DesignPage() {
     )
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function handleSubmit(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
     setError("")
     setPrediction(null)
 
-    if (!form.latitude || !form.longitude) {
-      setError("Latitude and longitude are required.")
+    const values = {
+      latitude: Number(form.latitude),
+      longitude: Number(form.longitude),
+      ambient: optionalNumber(form.ambient_temp_c),
+      windSpeed: optionalNumber(form.wind_speed_ms),
+      windDirection: optionalNumber(form.wind_direction_deg),
+      ghi: optionalNumber(form.ghi_kwh_m2_day),
+      humidity: optionalNumber(form.warm_humidity_pct),
+      rain: optionalNumber(form.rain_last_7days_mm),
+    }
+    if (!Number.isFinite(values.latitude) || values.latitude < -90 || values.latitude > 90 || !Number.isFinite(values.longitude) || values.longitude < -180 || values.longitude > 180) {
+      setError("Enter a valid latitude (-90 to 90) and longitude (-180 to 180).")
+      return
+    }
+    if (values.ambient !== undefined && !Number.isFinite(values.ambient)) {
+      setError("Ambient temperature must be a valid number.")
+      return
+    }
+    if (values.windSpeed !== undefined && (!Number.isFinite(values.windSpeed) || values.windSpeed < 0)) {
+      setError("Wind speed cannot be negative.")
+      return
+    }
+    if (values.windDirection !== undefined && (!Number.isFinite(values.windDirection) || values.windDirection < 0 || values.windDirection > 360)) {
+      setError("Wind direction must be between 0 and 360 degrees.")
+      return
+    }
+    if (values.ghi !== undefined && (!Number.isFinite(values.ghi) || values.ghi < 0) || values.humidity !== undefined && (!Number.isFinite(values.humidity) || values.humidity < 0 || values.humidity > 100) || values.rain !== undefined && (!Number.isFinite(values.rain) || values.rain < 0)) {
+      setError("GHI and rainfall cannot be negative; humidity must be between 0 and 100%.")
       return
     }
 
     const request: DesignPredictionRequest = {
-      latitude: Number(form.latitude),
-      longitude: Number(form.longitude),
-      ambient_temp_c: optionalNumber(form.ambient_temp_c),
-      wind_speed_ms: optionalNumber(form.wind_speed_ms),
-      wind_direction_deg: optionalNumber(form.wind_direction_deg),
-      ghi_kwh_m2_day: optionalNumber(form.ghi_kwh_m2_day),
-      warm_humidity_pct: optionalNumber(form.warm_humidity_pct),
+      latitude: values.latitude,
+      longitude: values.longitude,
+      ambient_temp_c: values.ambient,
+      wind_speed_ms: values.windSpeed,
+      wind_direction_deg: values.windDirection,
+      ghi_kwh_m2_day: values.ghi,
+      warm_humidity_pct: values.humidity,
       hot_air_index: form.hot_air_index || null,
-      rain_last_7days_mm: optionalNumber(form.rain_last_7days_mm),
+      rain_last_7days_mm: values.rain,
     }
 
     try {
       setLoading(true)
-      const response = await predictDesign(request)
+      const response = withWallMaterial(await predictDesign(request))
       setPrediction(response)
-    } catch {
-      // Robust offline fallback if backend server is unreachable
-      setPrediction({
-        status: "fallback",
-        shelter_material_and_design: JSON.stringify({
-          material_class: 1,
-          wwr: 0.15,
-          wall_thickness_cm: 55,
-          glazing_ratio: 0.78,
-          insulation_r_value: 6.2,
-        }),
-        material_class: 1,
-        wwr: 0.15,
-        wall_thickness_cm: 55,
-        glazing_ratio: 0.78,
-        insulation_r_value: 6.2,
-      })
+      sessionStorage.setItem("thermal-design-result", JSON.stringify(response))
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Design prediction failed. Please try again.")
     } finally {
       setLoading(false)
     }
   }
-
-  // Derive optimization target parameters for Chapter 3b auto-refine link
-  const mappedMaterial =
-    prediction?.material_class === 1 || prediction?.material_class === 4
-      ? "insulated_panel"
-      : prediction?.material_class === 2
-      ? "aac"
-      : "brick"
-  const mappedInsulationMm = Math.round(
-    ((prediction?.insulation_r_value ?? 5.2) * 0.035) * 1000
-  )
-  const mappedGlazing =
-    (prediction?.glazing_ratio ?? 0.7) > 0.65 ? "low_e" : "double"
-
-  const refineUrl = `/dashboard?location=${encodeURIComponent(
-    activePreset
-  )}&outdoor_temp_c=${form.ambient_temp_c}&material=${mappedMaterial}&insulation_mm=${mappedInsulationMm}&glazing=${mappedGlazing}&area_m2=90`
 
   return (
     <main className="min-h-screen bg-background">
@@ -398,6 +389,9 @@ export default function DesignPage() {
                 <div className="flex items-center gap-2 border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{error}</span>
+                  <Button type="button" variant="outline" size="xs" className="ml-auto" onClick={() => void handleSubmit()} disabled={loading}>
+                    Retry
+                  </Button>
                 </div>
               )}
 
@@ -446,7 +440,7 @@ export default function DesignPage() {
                         Recommended Classification
                       </p>
                       <p className="mt-1 font-mono text-sm font-semibold text-foreground">
-                        Material Class #{prediction.material_class ?? "1"}
+                        {prediction.material_name ?? `Design profile class ${prediction.material_class}`}
                       </p>
                     </div>
                   </div>
@@ -487,17 +481,16 @@ export default function DesignPage() {
                     />
                   </div>
 
-                  {/* Chapter 3b Auto-Refine Loop Button */}
                   <div className="space-y-3 pt-2">
-                    <Link
-                      href={refineUrl}
-                      className={cn(buttonVariants({ size: "lg" }), "w-full text-center")}
-                    >
-                      <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    <div className="border border-border p-3">
+                      <p className="text-xs font-mono text-muted-foreground">Structured result ready for the next optimization chapter.</p>
                       Auto-Refine in NSGA-II Optimizer →
-                    </Link>
+                    </div>
+                    <Button type="button" variant="outline" size="lg" className="w-full" onClick={() => setPrediction(null)}>
+                      Edit inputs / try another location
+                    </Button>
                     <p className="text-center text-[11px] text-muted-foreground">
-                      Pushes these classified parameters directly into the Pareto multi-objective dashboard.
+                      The structured specification can be passed directly to later chapters.
                     </p>
                   </div>
                 </div>

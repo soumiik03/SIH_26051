@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -15,15 +15,15 @@ import {
 } from "lucide-react"
 
 import {
-  predictThermalEnergy,
   getClimate,
   GOLDEN_PRESETS,
   type ThermalEnergyRequest,
 } from "@/lib/api"
+import { predictThermalEnergy, type ThermalEnergyResult } from "@/lib/api/thermal-energy"
+import type { DesignResult } from "@/lib/api/design"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Stat } from "@/components/ui/stat"
 
 type FormState = {
   latitude: string
@@ -53,7 +53,7 @@ const initialForm: FormState = {
   thermal_mass_kj_k: "12500",
 }
 
-const WALL_MATERIALS = ["Rammed_Earth", "Stone", "Mud_Brick", "Concrete"]
+const WALL_MATERIALS = ["Concrete", "Mud_Brick", "Rammed_Earth", "Stone"] as const
 
 function optionalNumber(value: string): number | undefined {
   return value.trim() === "" ? undefined : Number(value)
@@ -66,13 +66,43 @@ export default function ThermalEnergyPage() {
   const [climateSynced, setClimateSynced] = useState(false)
   const [error, setError] = useState("")
   const [activePreset, setActivePreset] = useState<string>("Leh")
-  const [result, setResult] = useState<number | null>(null)
+  const [result, setResult] = useState<ThermalEnergyResult | null>(null)
+  const [designResult, setDesignResult] = useState<DesignResult | null>(null)
+  const [prefillMessage, setPrefillMessage] = useState("")
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const stored = sessionStorage.getItem("thermal-design-result")
+      if (!stored) return
+      try {
+        setDesignResult(JSON.parse(stored) as DesignResult)
+      } catch {
+        sessionStorage.removeItem("thermal-design-result")
+      }
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   function updateField(field: keyof FormState, value: string) {
     setForm((previous) => ({
       ...previous,
       [field]: value,
     }))
+  }
+
+  function pullFromDesign() {
+    if (!designResult) return
+    setForm((previous) => ({
+      ...previous,
+      wall_material: designResult.material_name ?? previous.wall_material,
+      wall_thickness_cm: String(designResult.wall_thickness_cm),
+      glazing_ratio: String(designResult.glazing_ratio),
+      insulation_r_value: String(designResult.insulation_r_value),
+    }))
+    setPrefillMessage(designResult.material_name
+      ? "Design result applied: material, wall thickness, glazing, and insulation."
+      : "Design result applied: wall thickness, glazing, and insulation. Choose wall material manually because this design class has no source material label.")
+    setError("")
   }
 
   function applyPreset(key: keyof typeof GOLDEN_PRESETS) {
@@ -122,7 +152,8 @@ export default function ThermalEnergyPage() {
           setForm((prev) => ({
             ...prev,
             ambient_temp_c: String(climate.ambient_temp_c),
-            ghi_w_m2: String(Math.round((climate.ghi_kwh_m2_day * 1000) / 6)),
+            // Leave GHI blank so the backend solar service calculates it.
+            ghi_w_m2: "",
           }))
           setClimateSynced(true)
         } catch {
@@ -131,7 +162,7 @@ export default function ThermalEnergyPage() {
           setLocationLoading(false)
         }
       },
-      (locationError) => {
+      () => {
         setLocationLoading(false)
         setError("Unable to retrieve GPS coordinates. You can select a golden preset above.")
       },
@@ -139,57 +170,54 @@ export default function ThermalEnergyPage() {
     )
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function handleSubmit(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
     setError("")
     setResult(null)
 
-    if (
-      !form.latitude ||
-      !form.longitude ||
-      !form.shelter_volume_m3 ||
-      !form.wall_material ||
-      !form.wall_thickness_cm ||
-      !form.glazing_ratio ||
-      !form.insulation_r_value
-    ) {
+    const latitude = Number(form.latitude)
+    const longitude = Number(form.longitude)
+    const hour = optionalNumber(form.hour)
+    const volume = Number(form.shelter_volume_m3)
+    const thickness = Number(form.wall_thickness_cm)
+    const glazing = Number(form.glazing_ratio)
+    const insulation = Number(form.insulation_r_value)
+    const ambient = optionalNumber(form.ambient_temp_c)
+    const ghi = optionalNumber(form.ghi_w_m2)
+    const thermalMass = optionalNumber(form.thermal_mass_kj_k)
+    if (!form.latitude || !form.longitude || !form.shelter_volume_m3 || !form.wall_material || !form.wall_thickness_cm || !form.glazing_ratio || !form.insulation_r_value) {
       setError("Please fill in all required shelter parameters.")
+      return
+    }
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || hour !== undefined && (!Number.isInteger(hour) || hour < 0 || hour > 23) || !Number.isFinite(volume) || volume <= 0 || !Number.isFinite(thickness) || thickness <= 0 || !Number.isFinite(glazing) || glazing < 0 || glazing > 1 || !Number.isFinite(insulation) || insulation < 0 || ambient !== undefined && !Number.isFinite(ambient) || ghi !== undefined && (!Number.isFinite(ghi) || ghi < 0) || thermalMass !== undefined && (!Number.isFinite(thermalMass) || thermalMass <= 0)) {
+      setError("Check the inputs: coordinates, hour, volume, wall values, and optional climate values must be within valid physical ranges.")
       return
     }
 
     const request: ThermalEnergyRequest = {
-      latitude: Number(form.latitude),
-      longitude: Number(form.longitude),
-      hour: optionalNumber(form.hour),
-      shelter_volume_m3: Number(form.shelter_volume_m3),
+      latitude,
+      longitude,
+      hour,
+      shelter_volume_m3: volume,
       wall_material: form.wall_material,
-      wall_thickness_cm: Number(form.wall_thickness_cm),
-      glazing_ratio: Number(form.glazing_ratio),
-      insulation_r_value: Number(form.insulation_r_value),
-      ghi_w_m2: optionalNumber(form.ghi_w_m2),
-      ambient_temp_c: optionalNumber(form.ambient_temp_c),
-      thermal_mass_kj_k: optionalNumber(form.thermal_mass_kj_k),
+      wall_thickness_cm: thickness,
+      glazing_ratio: glazing,
+      insulation_r_value: insulation,
+      ghi_w_m2: ghi,
+      ambient_temp_c: ambient,
+      thermal_mass_kj_k: thermalMass,
     }
 
     try {
       setLoading(true)
       const response = await predictThermalEnergy(request)
-      setResult(response.thermal_energy_kwh)
-    } catch {
-      // Robust offline fallback simulation
-      const vol = Number(form.shelter_volume_m3)
-      const deltaT = Math.max(0, 21.0 - (optionalNumber(form.ambient_temp_c) ?? -6.0))
-      const rVal = Number(form.insulation_r_value)
-      const estimated = Math.round(((vol * 0.05 * deltaT) / (1 + rVal * 0.2)) * 10) / 10
-      setResult(estimated)
+      setResult(response)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Thermal energy prediction failed. Please try again.")
     } finally {
       setLoading(false)
     }
   }
-
-  const dailyHeating = result !== null ? Math.round(result * 18 * 10) / 10 : null
-  const annualHeating = dailyHeating !== null ? Math.round(dailyHeating * 120) : null
-  const estimatedKeroseneLiters = annualHeating !== null ? Math.round(annualHeating / 9.6) : null
 
   return (
     <main className="min-h-screen bg-background">
@@ -269,6 +297,18 @@ export default function ThermalEnergyPage() {
                   <div className="mb-4 flex items-center gap-2 border border-success/40 bg-success/10 px-3 py-2 text-xs text-success">
                     <CloudSun className="h-4 w-4" />
                     <span>NASA POWER climate data successfully synced for coordinates.</span>
+                  </div>
+                )}
+
+                {designResult && (
+                  <div className="mb-4 border border-accent/40 bg-accent/10 p-3 text-xs text-accent">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Design result available for cross-flow prefill.</span>
+                      <Button type="button" variant="outline" size="xs" onClick={pullFromDesign}>
+                        Pull from Design result
+                      </Button>
+                    </div>
+                    {prefillMessage && <p className="mt-2 text-muted-foreground">{prefillMessage}</p>}
                   </div>
                 )}
 
@@ -405,6 +445,9 @@ export default function ThermalEnergyPage() {
                 <div className="flex items-center gap-2 border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{error}</span>
+                  <Button type="button" variant="outline" size="xs" className="ml-auto" onClick={() => void handleSubmit()} disabled={loading}>
+                    Retry
+                  </Button>
                 </div>
               )}
 
@@ -452,38 +495,16 @@ export default function ThermalEnergyPage() {
                     </p>
                     <div className="mt-2 flex items-baseline justify-center">
                       <span className="data-value text-6xl font-bold tracking-tight text-foreground">
-                        {result.toFixed(2)}
+                        {result.thermal_energy_kwh.toFixed(2)}
                       </span>
                       <span className="ml-1 text-2xl font-mono text-muted-foreground">kWh</span>
                     </div>
                   </div>
 
-                  {/* Energy Context Breakdown */}
+                  {/* No unsupported external benchmark is fabricated here. */}
                   <div className="space-y-3 rounded-none border border-border bg-background p-4">
-                    <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border pb-2">
-                      Projected Heating Requirements
-                    </p>
-
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground">Daily Winter Demand:</span>
-                      <span className="data-value font-semibold text-foreground">
-                        {dailyHeating} kWh / day
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground">Annual Season Demand (120d):</span>
-                      <span className="data-value font-semibold text-foreground">
-                        {annualHeating?.toLocaleString()} kWh
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground">Equivalent Kerosene / Bukhari:</span>
-                      <span className="data-value font-semibold text-accent">
-                        ~{estimatedKeroseneLiters?.toLocaleString()} Liters
-                      </span>
-                    </div>
+                    <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border pb-2">MODEL CONTEXT</p>
+                    <p className="text-xs text-muted-foreground">This is the trained model&apos;s estimate for the submitted hour. The available data contains no validated fossil-fuel benchmark, so no comparison value is shown.</p>
                   </div>
 
                   {/* Passive Efficiency Advice */}
@@ -498,6 +519,9 @@ export default function ThermalEnergyPage() {
                   </div>
 
                   <div className="border-t border-border pt-4 text-center">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setResult(null)}>
+                      Edit inputs / try another location
+                    </Button>
                     <Link
                       href={`/dashboard?location=${encodeURIComponent(activePreset)}&outdoor_temp_c=${form.ambient_temp_c}`}
                       className="inline-flex items-center gap-1.5 text-xs font-mono text-accent hover:underline"

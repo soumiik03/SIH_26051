@@ -14,13 +14,18 @@ async function apiFetch<TResponse>(
   options: RequestInit = {}
 ): Promise<TResponse> {
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    throw new ApiError(0, "The prediction service could not be reached. Check that the backend is running.");
+  }
 
   if (!res.ok) {
     let detail: string;
@@ -33,7 +38,11 @@ async function apiFetch<TResponse>(
     throw new ApiError(res.status, detail);
   }
 
-  return res.json() as Promise<TResponse>;
+  try {
+    return (await res.json()) as TResponse;
+  } catch {
+    throw new ApiError(res.status, "The prediction service returned an invalid response.");
+  }
 }
 
 /** Thrown when the backend returns a non-2xx response. */
@@ -127,10 +136,19 @@ export interface IndoorTempResponse {
 export async function predictIndoorTemp(
   body: IndoorTempRequest
 ): Promise<IndoorTempResponse> {
-  return apiFetch<IndoorTempResponse>("/predict/indoor-temp", {
+  const response = await apiFetch<unknown>("/predict/indoor-temp", {
     method: "POST",
     body: JSON.stringify(body),
   });
+  if (
+    typeof response !== "object" ||
+    response === null ||
+    typeof (response as { indoor_temperature_C?: unknown }).indoor_temperature_C !== "number" ||
+    !Number.isFinite((response as { indoor_temperature_C: number }).indoor_temperature_C)
+  ) {
+    throw new ApiError(200, "The prediction service returned an incomplete temperature result.");
+  }
+  return response as IndoorTempResponse;
 }
 
 // ─── /predict/thermal-energy ─────────────────────────────────────────────────
