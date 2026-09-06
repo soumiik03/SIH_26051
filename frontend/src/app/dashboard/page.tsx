@@ -578,7 +578,10 @@ function DashboardContent() {
                       NSGA-II Pareto Optimization Frontier
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                      Capital Cost ($) vs Daily Heating Load (kWh)
+                      Capital Cost (₹) vs Daily Heating Load (kWh)
+                    </p>
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      Cost basis: LSoR 2024 (UT Ladakh R&amp;B; CPWD DSR 2023 cross-check)
                     </p>
                   </div>
                   <Badge variant="default" className="font-mono text-[10px]">
@@ -596,7 +599,7 @@ function DashboardContent() {
                         type="number"
                         dataKey="estimated_install_cost"
                         name="Install Cost"
-                        unit="$"
+                        unit="₹"
                         stroke="rgba(255,255,255,0.4)"
                         fontSize={11}
                       />

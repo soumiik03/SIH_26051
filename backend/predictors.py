@@ -9,10 +9,20 @@ try:
     from catalog import GLAZING, MATERIALS, material_name, glazing_name
     from optimization_schemas import AnalysisRequest, Design
     from services import model_loader
+    from services.envelope_physics import (
+        calculate_envelope_heat_loss_w,
+        calculate_shelter_areas,
+        calculate_u_values,
+    )
 except ImportError:
     from backend.catalog import GLAZING, MATERIALS, material_name, glazing_name
     from backend.optimization_schemas import AnalysisRequest, Design
     from backend.services import model_loader
+    from backend.services.envelope_physics import (
+        calculate_envelope_heat_loss_w,
+        calculate_shelter_areas,
+        calculate_u_values,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -68,14 +78,15 @@ def envelope_u_value(design: Design) -> float:
 
 
 def estimate_install_cost(design: Design) -> float:
-    """Estimate total shelter envelope installation cost in USD / standardized units."""
+    """Estimate total shelter envelope installation cost in INR."""
     window_area = design.area_m2 * 0.18
     opaque_area = max(10.0, design.area_m2 * 2.3 - window_area)
-    mat_cost = MATERIALS.get(design.material, {}).get("cost_per_m2", 33.0)
-    glaze_cost = GLAZING.get(design.glazing, {}).get("cost_per_m2", 52.0)
-    insulation_cost = design.area_m2 * design.insulation_mm * 0.045
+    mat_cost = MATERIALS.get(design.material, {}).get("cost_per_m3_inr", 3000.0)
+    glaze_cost = GLAZING.get(design.glazing, {}).get("cost_per_m2_inr", 4300.0)
+    wall_volume_m3 = opaque_area * 0.30
+    insulation_cost = design.area_m2 * design.insulation_mm * 18.0
     return round(
-        opaque_area * mat_cost + window_area * glaze_cost + insulation_cost,
+        wall_volume_m3 * mat_cost + window_area * glaze_cost + insulation_cost,
         2,
     )
 
@@ -183,78 +194,22 @@ def predict_indoor_temperature(
 def predict_daily_heating_kwh(
     request: AnalysisRequest, design: Design | None = None
 ) -> float:
-    """Predict total daily heating demand in kWh using ML model or degree-hour deficit."""
+    """Predict daily heating demand using the shared four-part envelope model."""
     selected = design or request.design
-    lat, lon = get_coords(request.location)
+    material_key = {"brick": "mud_brick", "aac": "rammed_earth", "insulated_panel": "concrete"}[selected.material]
+    insulation_r = selected.insulation_mm / 1000.0 / 0.035
+    u_values = calculate_u_values(material_key, 30.0, insulation_r)
+    areas = calculate_shelter_areas(selected.area_m2 * 2.8, GLAZING_RATIO_MAP[selected.glazing])
 
-    # Attempt trained ML model inference first
-    try:
-        model = model_loader.get_model("thermal_energy")
-        scaler = model_loader.get_scaler("thermal_energy")
-        le = model_loader.get_label_encoder("thermal_energy", "le_file")
-        features = model_loader.get_features("thermal_energy")
-
-        if model is not None and scaler is not None and le is not None and features:
-            wall_mat_str = THERMAL_ENERGY_MATERIAL_NAME.get(
-                selected.material, "Mud_Brick"
-            )
-            mat_encoded = le.transform([wall_mat_str])[0]
-            vol_m3 = selected.area_m2 * 2.8
-            wall_th_cm = 45.0
-            r_val = 1.0 / max(0.01, envelope_u_value(selected))
-            glaze_ratio = GLAZING_RATIO_MAP.get(selected.glazing, 0.25)
-            thermal_mass_val = vol_m3 * wall_th_cm * 12.0
-
-            rows = []
-            for hour in range(24):
-                ambient = request.outdoor_temp_c + 4.0 * sin(
-                    (hour - 8) * pi / 12
-                )
-                ghi_val = max(0.0, sin((hour - 6) * pi / 12)) * (
-                    request.solar_kwh_m2 * 1000.0 / 6.0
-                )
-                rows.append(
-                    {
-                        "latitude": lat,
-                        "longitude": lon,
-                        "hour": hour,
-                        "shelter_volume_m3": vol_m3,
-                        "wall_material": mat_encoded,
-                        "wall_thickness_cm": wall_th_cm,
-                        "glazing_ratio": glaze_ratio,
-                        "insulation_r_value": r_val,
-                        "ghi_w_m2": ghi_val,
-                        "ambient_temp_c": ambient,
-                        "thermal_mass_kj_k": thermal_mass_val,
-                    }
-                )
-
-            batch_df = pd.DataFrame(rows, columns=features)
-            batch_df["ambient_temp_c"] = scaler.transform(
-                batch_df[["ambient_temp_c"]]
-            )
-            raw_kwh = model.predict(batch_df)
-            total_kwh = float(np.sum(np.clip(raw_kwh, 0.0, None)))
-            # Scale appropriately for shelter area and occupant gains
-            occupant_offset = request.occupants * 1.5
-            return round(max(0.0, total_kwh - occupant_offset), 2)
-    except Exception as exc:
-        logger.warning(
-            "ML inference for thermal energy failed, falling back to calibrated deficit: %s",
-            exc,
+    total_wh = 0.0
+    for hour in range(24):
+        ambient = request.outdoor_temp_c + 4.0 * sin((hour - 8) * pi / 12)
+        loss = calculate_envelope_heat_loss_w(
+            u_values, areas["wall"], areas["glazing"], areas["roof"], areas["floor"],
+            request.target_temp_c, ambient,
         )
-
-    # Calibrated Degree-Hour Deficit Fallback
-    temperatures = predict_indoor_temperature(request, selected)
-    deficit_degree_hours = sum(
-        max(0.0, request.target_temp_c - p["indoor"]) for p in temperatures
-    )
-    glaze_u = GLAZING.get(selected.glazing, {}).get("u_value", 2.8)
-    heat_loss_factor = (
-        envelope_u_value(selected) * selected.area_m2 * 0.018
-        + glaze_u * selected.area_m2 * 0.002
-    )
-    return round(deficit_degree_hours * heat_loss_factor, 2)
+        total_wh += loss["total"]
+    return round(total_wh / 1000.0, 2)
 
 
 def build_analysis(

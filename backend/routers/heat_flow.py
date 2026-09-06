@@ -23,6 +23,10 @@ try:
         HeatFlowSummary,
     )
     from services import model_loader, solar, climate
+    from services.envelope_physics import (
+        calculate_envelope_heat_loss_w,
+        calculate_u_values as shared_calculate_u_values,
+    )
 except ImportError:
     from backend.schemas.heat_flow import (
         HeatFlowRequest,
@@ -33,6 +37,10 @@ except ImportError:
         HeatFlowSummary,
     )
     from backend.services import model_loader, solar, climate
+    from backend.services.envelope_physics import (
+        calculate_envelope_heat_loss_w,
+        calculate_u_values as shared_calculate_u_values,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +48,6 @@ router = APIRouter(tags=["Heat Flow & 3D Visualization"])
 
 # ── Material Properties ──────────────────────────────────────────────
 # Conductivity in W/(m·K)
-MATERIAL_CONDUCTIVITY: Dict[str, float] = {
-    "stone": 1.8,
-    "rammed_earth": 0.9,
-    "mud_brick": 0.6,
-    "concrete": 1.4,
-}
-
 # Thermal mass in MJ/(m3·K)
 MATERIAL_THERMAL_MASS: Dict[str, float] = {
     "stone": 2.2,
@@ -124,44 +125,8 @@ def calculate_u_values(
     insulation_r_value: float,
 ) -> EnvelopeUValues:
     """Calculate thermal transmittance U (W/m2·K) for walls, glazing, roof, and floor."""
-    mat_key = wall_material.strip().lower().replace(" ", "_")
-    k = MATERIAL_CONDUCTIVITY.get(mat_key, 1.2)
-    d_m = max(0.05, wall_thickness_cm / 100.0)
-
-    # R_wall = R_material + R_insulation + surface resistances (R_si + R_se ~ 0.17 m2K/W)
-    r_mat = d_m / k
-    r_total = r_mat + max(0.0, insulation_r_value) + 0.17
-    u_wall = round(1.0 / r_total, 4)
-
-    # Standard double glazing U-value
-    u_glazing = 2.80
-
-    # Roof: lightweight metal/tile roofing with purlins and optional insulation.
-    # R_roof_base ~ 0.4 (metal sheet + air gap + timber rafter) at Ladakh altitude.
-    # At 3500m the clear night sky radiative sink is aggressive, so roof is a
-    # dominant loss path even with some insulation.
-    # If wall insulation is applied, assume ~40% is also applied to roof.
-    r_roof_base = 0.4
-    r_roof_insulation = max(0.0, insulation_r_value) * 0.4
-    r_roof = r_roof_base + r_roof_insulation + 0.14  # surface resistances
-    u_roof = round(1.0 / r_roof, 4)
-
-    # Floor: slab-on-grade with ground coupling.
-    # Ground temperature at Ladakh depth ~1m is roughly 5-8°C year-round,
-    # much warmer than air in winter. Effective U_floor is moderate.
-    # R_floor = R_slab (0.15m concrete / 1.4 W/mK) + R_ground (~2.0) + R_si
-    r_slab = 0.15 / 1.4
-    r_ground = 2.0  # effective ground coupling resistance
-    r_floor = r_slab + r_ground + 0.17
-    u_floor = round(1.0 / r_floor, 4)
-
-    return EnvelopeUValues(
-        u_wall=u_wall,
-        u_glazing=u_glazing,
-        u_roof=u_roof,
-        u_floor=u_floor,
-        r_wall_total=round(r_total, 3),
-    )
+    shared = shared_calculate_u_values(wall_material, wall_thickness_cm, insulation_r_value)
+    return EnvelopeUValues(**shared.__dict__)
 
 
 def _get_indoor_material_label(wall_material: str, le_classes: list) -> str:
@@ -321,19 +286,15 @@ def predict_heat_flow(payload: HeatFlowRequest):
             direction = "gain"
             eff_dt = abs(delta_t)
 
-        # Conduction heat loss through envelope (Watts = W/m2K * m2 * K)
-        q_walls = round(u_values.u_wall * geometry.wall_area_net_m2 * eff_dt, 1)
-        q_glazing = round(u_values.u_glazing * geometry.glazing_area_m2 * eff_dt, 1)
-        q_roof = round(u_values.u_roof * geometry.roof_area_m2 * eff_dt, 1)
-
-        # Floor loss: slab-on-grade couples to ground, not outdoor air.
-        # Ground temp at ~1m depth in Ladakh is roughly +5°C year-round.
-        # Floor ΔT = |T_indoor - T_ground|, not |T_indoor - T_ambient|.
-        t_ground = 5.0  # approximate year-round ground temp at 1m depth in Ladakh
-        floor_dt = abs(t_in - t_ground) if direction == "loss" else abs(t_ground - t_in)
-        q_floor = round(u_values.u_floor * geometry.floor_area_m2 * floor_dt, 1)
-
-        q_total = round(q_walls + q_glazing + q_roof + q_floor, 1)
+        heat_loss = calculate_envelope_heat_loss_w(
+            u_values, geometry.wall_area_net_m2, geometry.glazing_area_m2,
+            geometry.roof_area_m2, geometry.floor_area_m2, t_in, t_out,
+        )
+        q_walls = heat_loss["walls"]
+        q_glazing = heat_loss["glazing"]
+        q_roof = heat_loss["roof"]
+        q_floor = heat_loss["floor"]
+        q_total = heat_loss["total"]
 
         if direction == "loss":
             total_q_loss_wh += q_total

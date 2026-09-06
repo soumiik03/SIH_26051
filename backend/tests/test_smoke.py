@@ -254,6 +254,32 @@ def test_optimization_dashboard(client):
     assert "indoor_temperature_24h" in data["baseline"]
     assert len(data["baseline"]["indoor_temperature_24h"]) == 24
 
+    # The optimizer's heating objective must use the same shared envelope
+    # physics as a direct calculation for the returned design.
+    from optimization_schemas import AnalysisRequest, Design
+    from predictors import predict_daily_heating_kwh
+    from services.envelope_physics import (
+        calculate_envelope_heat_loss_w,
+        calculate_shelter_areas,
+        calculate_u_values,
+    )
+    point = data["pareto_front"][0]
+    design = Design(**point["design"])
+    direct_request = AnalysisRequest(**payload)
+    material_key = {"brick": "mud_brick", "aac": "rammed_earth", "insulated_panel": "concrete"}[design.material]
+    u_values = calculate_u_values(material_key, 30.0, design.insulation_mm / 1000.0 / 0.035)
+    areas = calculate_shelter_areas(design.area_m2 * 2.8, {"single": 0.15, "double": 0.25, "low_e": 0.35}[design.glazing])
+    expected_wh = 0.0
+    import math
+    for hour in range(24):
+        ambient = direct_request.outdoor_temp_c + 4.0 * math.sin((hour - 8) * math.pi / 12)
+        expected_wh += calculate_envelope_heat_loss_w(
+            u_values, areas["wall"], areas["glazing"], areas["roof"], areas["floor"],
+            direct_request.target_temp_c, ambient,
+        )["total"]
+    assert point["daily_heating_kwh"] == round(expected_wh / 1000.0, 2)
+    assert predict_daily_heating_kwh(direct_request, design) == point["daily_heating_kwh"]
+
 
 def test_golden_case(client):
     """Verify /optimization/golden/Leh endpoint."""
@@ -387,5 +413,4 @@ def test_heat_flow_solar_tracking(client):
     assert h12["ghi_w_m2"] > 200.0
     assert 140.0 <= h12["sun_azimuth_deg"] <= 220.0
     print(f"\n[Solar Tracking] Hour 12: Elevation={h12['sun_elevation_deg']}°, Azimuth={h12['sun_azimuth_deg']}°, GHI={h12['ghi_w_m2']} W/m²")
-
 
