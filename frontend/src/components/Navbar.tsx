@@ -23,6 +23,11 @@ export function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Do not render navbar on the landing page
+  if (pathname === "/") {
+    return null;
+  }
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur-md">
       <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 sm:px-6">
@@ -34,10 +39,7 @@ export function Navbar() {
           <span className="flex h-7 w-7 items-center justify-center border border-border bg-card text-accent">
             <Compass size={16} />
           </span>
-          <span className="font-sans font-bold">Cold-Climate Shelter</span>
-          <span className="hidden rounded-none border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-block">
-            SIH 26051
-          </span>
+          <span className="font-sans font-bold">Thermaform</span>
         </Link>
 
         {/* Desktop Nav Items */}

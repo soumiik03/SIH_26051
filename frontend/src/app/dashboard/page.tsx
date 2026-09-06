@@ -166,7 +166,7 @@ function DashboardContent() {
     pdf.setFontSize(8)
     pdf.setTextColor(246, 241, 231) // Warm cream subtext
     pdf.text(
-      "Smart India Hackathon · Problem Statement 26051 · ML & NSGA-II Thermal Evaluation Report",
+      "Thermaform · Thermal performance evaluation report",
       14,
       21
     )
@@ -420,22 +420,6 @@ function DashboardContent() {
             </Button>
           </div>
 
-          {/* Quick Preset Chips */}
-          <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
-            <span className="text-[11px] font-mono text-muted-foreground">QUICK PRESETS:</span>
-            {(["Leh", "Dras", "Kargil"] as const).map((key) => (
-              <Button
-                key={key}
-                type="button"
-                variant={activePreset === key ? "default" : "outline"}
-                size="xs"
-                onClick={() => applyPreset(key)}
-              >
-                <Sparkles className="mr-1 h-3 w-3" />
-                {key}
-              </Button>
-            ))}
-          </div>
         </Card>
 
         {notice && (

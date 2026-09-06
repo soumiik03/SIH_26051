@@ -7,10 +7,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --font-cinzel: var(--font-cinzel);
   --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
   --font-mono: var(--font-mono);
-  --font-heading: var(--font-sans);
-  /* Expose monospace as a Tailwind font utility */
+  --font-heading: var(--font-display);
   --font-data: var(--font-mono);
 
   /* Semantic color tokens */
@@ -172,5 +173,29 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
+  }
+
+  /* Exhibition Engraved Style */
+  .fair-title {
+    font-family: var(--font-cinzel), var(--font-display), serif;
+    letter-spacing: 0.12em;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45), 0 0 35px rgba(246, 241, 231, 0.25);
+  }
+
+  /* Pixel / Engraved Decorative Button */
+  .fair-btn {
+    position: relative;
+    border: 2px solid rgba(246, 241, 231, 0.75);
+    outline: 1px solid rgba(0, 0, 0, 0.35);
+    outline-offset: 3px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 0 12px rgba(255, 255, 255, 0.2);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .fair-btn:hover {
+    transform: translateY(-2px);
+    border-color: #FFFFFF;
+    outline-color: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.4);
   }
 }

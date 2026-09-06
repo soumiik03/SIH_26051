@@ -10,13 +10,11 @@ import {
   AlertCircle,
   CheckCircle2,
   CloudSun,
-  Sparkles,
   Flame,
 } from "lucide-react"
 
 import {
   getClimate,
-  GOLDEN_PRESETS,
   type ThermalEnergyRequest,
 } from "@/lib/api"
 import { predictThermalEnergy, type ThermalEnergyResult } from "@/lib/api/thermal-energy"
@@ -28,7 +26,6 @@ import { Input } from "@/components/ui/input"
 type FormState = {
   latitude: string
   longitude: string
-  hour: string
   shelter_volume_m3: string
   wall_material: string
   wall_thickness_cm: string
@@ -42,15 +39,14 @@ type FormState = {
 const initialForm: FormState = {
   latitude: "34.16",
   longitude: "77.58",
-  hour: "12",
   shelter_volume_m3: "120",
   wall_material: "Rammed_Earth",
   wall_thickness_cm: "45",
   glazing_ratio: "0.25",
   insulation_r_value: "5.2",
-  ghi_w_m2: "550",
-  ambient_temp_c: "-6.0",
-  thermal_mass_kj_k: "12500",
+  ghi_w_m2: "",
+  ambient_temp_c: "",
+  thermal_mass_kj_k: "",
 }
 
 const WALL_MATERIALS = ["Concrete", "Mud_Brick", "Rammed_Earth", "Stone"] as const
@@ -65,7 +61,7 @@ export default function ThermalEnergyPage() {
   const [locationLoading, setLocationLoading] = useState(false)
   const [climateSynced, setClimateSynced] = useState(false)
   const [error, setError] = useState("")
-  const [activePreset, setActivePreset] = useState<string>("Leh")
+  const [showOptionalClimate, setShowOptionalClimate] = useState(false)
   const [result, setResult] = useState<ThermalEnergyResult | null>(null)
   const [designResult, setDesignResult] = useState<DesignResult | null>(null)
   const [prefillMessage, setPrefillMessage] = useState("")
@@ -103,25 +99,6 @@ export default function ThermalEnergyPage() {
       ? "Design result applied: material, wall thickness, glazing, and insulation."
       : "Design result applied: wall thickness, glazing, and insulation. Choose wall material manually because this design class has no source material label.")
     setError("")
-  }
-
-  function applyPreset(key: keyof typeof GOLDEN_PRESETS) {
-    const p = GOLDEN_PRESETS[key]
-    setActivePreset(key)
-    setError("")
-    setForm({
-      latitude: String(p.thermalEnergyPreset.latitude ?? p.coords.lat),
-      longitude: String(p.thermalEnergyPreset.longitude ?? p.coords.lon),
-      hour: "12",
-      shelter_volume_m3: String(p.thermalEnergyPreset.shelter_volume_m3 ?? 120),
-      wall_material: p.thermalEnergyPreset.wall_material ?? "Rammed_Earth",
-      wall_thickness_cm: String(p.thermalEnergyPreset.wall_thickness_cm ?? 45),
-      glazing_ratio: String(p.thermalEnergyPreset.glazing_ratio ?? 0.25),
-      insulation_r_value: String(p.thermalEnergyPreset.insulation_r_value ?? 5.2),
-      ghi_w_m2: String(p.thermalEnergyPreset.ghi_w_m2 ?? 500),
-      ambient_temp_c: String(p.thermalEnergyPreset.ambient_temp_c ?? p.climate.ambient_temp_c),
-      thermal_mass_kj_k: String(p.thermalEnergyPreset.thermal_mass_kj_k ?? 12500),
-    })
   }
 
   async function useMyLocation() {
@@ -164,7 +141,7 @@ export default function ThermalEnergyPage() {
       },
       () => {
         setLocationLoading(false)
-        setError("Unable to retrieve GPS coordinates. You can select a golden preset above.")
+        setError("Unable to retrieve GPS coordinates. You can enter the coordinates manually.")
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     )
@@ -177,7 +154,7 @@ export default function ThermalEnergyPage() {
 
     const latitude = Number(form.latitude)
     const longitude = Number(form.longitude)
-    const hour = optionalNumber(form.hour)
+    const hour = 12
     const volume = Number(form.shelter_volume_m3)
     const thickness = Number(form.wall_thickness_cm)
     const glazing = Number(form.glazing_ratio)
@@ -189,8 +166,8 @@ export default function ThermalEnergyPage() {
       setError("Please fill in all required shelter parameters.")
       return
     }
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || hour !== undefined && (!Number.isInteger(hour) || hour < 0 || hour > 23) || !Number.isFinite(volume) || volume <= 0 || !Number.isFinite(thickness) || thickness <= 0 || !Number.isFinite(glazing) || glazing < 0 || glazing > 1 || !Number.isFinite(insulation) || insulation < 0 || ambient !== undefined && !Number.isFinite(ambient) || ghi !== undefined && (!Number.isFinite(ghi) || ghi < 0) || thermalMass !== undefined && (!Number.isFinite(thermalMass) || thermalMass <= 0)) {
-      setError("Check the inputs: coordinates, hour, volume, wall values, and optional climate values must be within valid physical ranges.")
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || !Number.isFinite(volume) || volume <= 0 || !Number.isFinite(thickness) || thickness <= 0 || !Number.isFinite(glazing) || glazing < 0 || glazing > 1 || !Number.isFinite(insulation) || insulation < 0 || ambient !== undefined && !Number.isFinite(ambient) || ghi !== undefined && (!Number.isFinite(ghi) || ghi < 0) || thermalMass !== undefined && (!Number.isFinite(thermalMass) || thermalMass <= 0)) {
+      setError("Check the coordinates, shelter values, and optional climate details.")
       return
     }
 
@@ -247,22 +224,6 @@ export default function ThermalEnergyPage() {
               </div>
             </div>
 
-            {/* Presets */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-muted-foreground">PRESETS:</span>
-              {(["Leh", "Dras", "Kargil"] as const).map((preset) => (
-                <Button
-                  key={preset}
-                  type="button"
-                  variant={activePreset === preset ? "default" : "outline"}
-                  size="xs"
-                  onClick={() => applyPreset(preset)}
-                >
-                  <Sparkles className="mr-1 h-3 w-3" />
-                  {preset}
-                </Button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -338,20 +299,11 @@ export default function ThermalEnergyPage() {
               <div>
                 <div className="mb-3 border-b border-border pb-2">
                   <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    2. Climate &amp; Hour
+                    2. Climate details
                   </h2>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <Field label="Hour (0-23)">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="23"
-                      className="font-mono text-sm"
-                      value={form.hour}
-                      onChange={(e) => updateField("hour", e.target.value)}
-                    />
-                  </Field>
+                <label className="mb-4 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={showOptionalClimate} onChange={(e) => setShowOptionalClimate(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />Add climate details manually</label>
+                {showOptionalClimate && <div className="grid grid-cols-2 gap-3">
                   <Field label="Ambient Temp (°C)">
                     <Input
                       type="number"
@@ -370,7 +322,7 @@ export default function ThermalEnergyPage() {
                       onChange={(e) => updateField("ghi_w_m2", e.target.value)}
                     />
                   </Field>
-                </div>
+                </div>}
               </div>
 
               {/* Envelope Geometry & Materials */}
@@ -523,7 +475,7 @@ export default function ThermalEnergyPage() {
                       Edit inputs / try another location
                     </Button>
                     <Link
-                      href={`/dashboard?location=${encodeURIComponent(activePreset)}&outdoor_temp_c=${form.ambient_temp_c}`}
+                      href={`/dashboard?outdoor_temp_c=${form.ambient_temp_c}`}
                       className="inline-flex items-center gap-1.5 text-xs font-mono text-accent hover:underline"
                     >
                       Compare in Results Dashboard →

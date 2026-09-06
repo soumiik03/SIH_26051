@@ -9,13 +9,11 @@ import {
   Building2,
   AlertCircle,
   CheckCircle2,
-  Sparkles,
   CloudSun,
 } from "lucide-react"
 
 import {
   getClimate,
-  GOLDEN_PRESETS,
 } from "@/lib/api"
 import { predictDesign, withWallMaterial, type DesignPredictionRequest, type DesignResult } from "@/lib/api/design"
 import { Button } from "@/components/ui/button"
@@ -37,13 +35,13 @@ type FormState = {
 const initialForm: FormState = {
   latitude: "34.16",
   longitude: "77.58",
-  ambient_temp_c: "-6.0",
-  wind_speed_ms: "3.5",
-  wind_direction_deg: "220",
-  ghi_kwh_m2_day: "5.4",
-  warm_humidity_pct: "25.0",
-  hot_air_index: "Extreme Freeze",
-  rain_last_7days_mm: "0.0",
+  ambient_temp_c: "",
+  wind_speed_ms: "",
+  wind_direction_deg: "",
+  ghi_kwh_m2_day: "",
+  warm_humidity_pct: "",
+  hot_air_index: "",
+  rain_last_7days_mm: "",
 }
 
 const HOT_AIR_INDEX_OPTIONS = [
@@ -63,9 +61,8 @@ export default function DesignPage() {
   const [loading, setLoading] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
   const [climateSynced, setClimateSynced] = useState(false)
+  const [showOptionalClimate, setShowOptionalClimate] = useState(false)
   const [error, setError] = useState("")
-  const [activePreset, setActivePreset] = useState<string>("Leh")
-
   const [prediction, setPrediction] = useState<DesignResult | null>(null)
 
   function updateField(field: keyof FormState, value: string) {
@@ -73,23 +70,6 @@ export default function DesignPage() {
       ...previous,
       [field]: value,
     }))
-  }
-
-  function applyPreset(key: keyof typeof GOLDEN_PRESETS) {
-    const p = GOLDEN_PRESETS[key]
-    setActivePreset(key)
-    setError("")
-    setForm({
-      latitude: String(p.coords.lat),
-      longitude: String(p.coords.lon),
-      ambient_temp_c: String(p.climate.ambient_temp_c),
-      wind_speed_ms: String(p.climate.wind_speed_ms),
-      wind_direction_deg: "220",
-      ghi_kwh_m2_day: String(p.climate.ghi_kwh_m2_day),
-      warm_humidity_pct: String(p.climate.humidity_pct),
-      hot_air_index: p.climate.hot_air_index,
-      rain_last_7days_mm: "0.0",
-    })
   }
 
   async function useMyLocation() {
@@ -228,22 +208,6 @@ export default function DesignPage() {
               </div>
             </div>
 
-            {/* Presets */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-muted-foreground">PRESETS:</span>
-              {(["Leh", "Dras", "Kargil"] as const).map((preset) => (
-                <Button
-                  key={preset}
-                  type="button"
-                  variant={activePreset === preset ? "default" : "outline"}
-                  size="xs"
-                  onClick={() => applyPreset(preset)}
-                >
-                  <Sparkles className="mr-1 h-3 w-3" />
-                  {preset}
-                </Button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -311,7 +275,8 @@ export default function DesignPage() {
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <label className="mb-4 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={showOptionalClimate} onChange={(e) => setShowOptionalClimate(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />Add environmental details manually</label>
+                {showOptionalClimate && <div className="grid grid-cols-2 gap-4">
                   <Field label="Ambient Temp (°C)">
                     <Input
                       type="number"
@@ -366,9 +331,9 @@ export default function DesignPage() {
                       onChange={(e) => updateField("rain_last_7days_mm", e.target.value)}
                     />
                   </Field>
-                </div>
+                </div>}
 
-                <div className="mt-4">
+                {showOptionalClimate && <div className="mt-4">
                   <Field label="Hot Air / Climate Index Category">
                     <select
                       className="w-full rounded-none border border-input bg-background p-2 text-xs text-foreground outline-none focus:border-ring"
@@ -382,7 +347,7 @@ export default function DesignPage() {
                       ))}
                     </select>
                   </Field>
-                </div>
+                </div>}
               </div>
 
               {error && (

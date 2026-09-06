@@ -10,13 +10,11 @@ import {
   AlertCircle,
   CheckCircle2,
   CloudSun,
-  Sparkles,
 } from "lucide-react"
 
 import {
   predictIndoorTemp,
   getClimate,
-  GOLDEN_PRESETS,
   type IndoorTempRequest,
 } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -27,8 +25,6 @@ import { COMFORT_BASIS, COMFORT_LOWER_BOUND_C } from "@/lib/constants"
 type FormState = {
   latitude: string
   longitude: string
-  month: string
-  hour: string
   outdoor_temperature_C: string
   wind_speed_mps: string
   thermal_mass_MJ_m3K: string
@@ -41,14 +37,12 @@ type FormState = {
 const initialForm: FormState = {
   latitude: "34.16",
   longitude: "77.58",
-  month: "1",
-  hour: "12",
-  outdoor_temperature_C: "-6.0",
-  wind_speed_mps: "3.5",
+  outdoor_temperature_C: "",
+  wind_speed_mps: "",
   thermal_mass_MJ_m3K: "2.2",
   insulation_r_value_m2K_W: "5.2",
   glazing: "0.25",
-  GHI_W_m2: "550",
+  GHI_W_m2: "",
   best_shelter_material:
     "Stabilized Rammed Earth + Straw-Clay cavity insulation; south Trombe wall with double low-E glazing",
 }
@@ -109,32 +103,13 @@ export default function IndoorTemperaturePage() {
   const [climateSynced, setClimateSynced] = useState(false)
   const [error, setError] = useState("")
   const [result, setResult] = useState<number | null>(null)
-  const [activePreset, setActivePreset] = useState<string>("Leh")
+  const [showOptionalClimate, setShowOptionalClimate] = useState(false)
 
   function updateField(field: keyof FormState, value: string) {
     setForm((previous) => ({
       ...previous,
       [field]: value,
     }))
-  }
-
-  function applyPreset(key: keyof typeof GOLDEN_PRESETS) {
-    const p = GOLDEN_PRESETS[key]
-    setActivePreset(key)
-    setError("")
-    setForm({
-      latitude: String(p.indoorTempPreset.latitude ?? p.coords.lat),
-      longitude: String(p.indoorTempPreset.longitude ?? p.coords.lon),
-      month: String(p.indoorTempPreset.month ?? 1),
-      hour: String(p.indoorTempPreset.hour ?? 12),
-      outdoor_temperature_C: String(p.indoorTempPreset.outdoor_temperature_C ?? p.climate.ambient_temp_c),
-      wind_speed_mps: String(p.indoorTempPreset.wind_speed_mps ?? p.climate.wind_speed_ms),
-      thermal_mass_MJ_m3K: String(p.indoorTempPreset.thermal_mass_MJ_m3K ?? 2.0),
-      insulation_r_value_m2K_W: String(p.indoorTempPreset.insulation_r_value_m2K_W ?? 5.0),
-      glazing: String(p.indoorTempPreset.glazing ?? 0.25),
-      GHI_W_m2: String(p.indoorTempPreset.GHI_W_m2 ?? 500),
-      best_shelter_material: p.indoorTempPreset.best_shelter_material ?? MATERIAL_OPTIONS[0],
-    })
   }
 
   async function useMyLocation() {
@@ -178,7 +153,7 @@ export default function IndoorTemperaturePage() {
       },
       () => {
         setLocationLoading(false)
-        setError("Unable to retrieve GPS coordinates. You can select a golden preset above.")
+      setError("Unable to retrieve GPS coordinates. You can enter the coordinates manually.")
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     )
@@ -191,8 +166,8 @@ export default function IndoorTemperaturePage() {
 
     const latitude = Number(form.latitude)
     const longitude = Number(form.longitude)
-    const month = Number(form.month)
-    const hour = Number(form.hour)
+    const month = 1
+    const hour = 12
     const thermalMass = Number(form.thermal_mass_MJ_m3K)
     const insulation = Number(form.insulation_r_value_m2K_W)
     const glazing = Number(form.glazing)
@@ -200,16 +175,12 @@ export default function IndoorTemperaturePage() {
     const wind = optionalNumber(form.wind_speed_mps)
     const ghi = optionalNumber(form.GHI_W_m2)
 
-    if (!form.latitude || !form.longitude || !form.month || !form.hour || !form.thermal_mass_MJ_m3K || !form.insulation_r_value_m2K_W || !form.glazing || !form.best_shelter_material) {
+    if (!form.latitude || !form.longitude || !form.thermal_mass_MJ_m3K || !form.insulation_r_value_m2K_W || !form.glazing || !form.best_shelter_material) {
       setError("Please complete all required fields before running the model.")
       return
     }
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
       setError("Enter a valid latitude (-90 to 90) and longitude (-180 to 180).")
-      return
-    }
-    if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(hour) || hour < 0 || hour > 23) {
-      setError("Choose a valid month and hour.")
       return
     }
     if (!Number.isFinite(thermalMass) || thermalMass <= 0 || !Number.isFinite(insulation) || insulation < 0 || !Number.isFinite(glazing) || glazing < 0 || glazing > 1) {
@@ -276,22 +247,6 @@ export default function IndoorTemperaturePage() {
               </div>
             </div>
 
-            {/* 1-Click Golden Presets */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-muted-foreground">PRESETS:</span>
-              {(["Leh", "Dras", "Kargil"] as const).map((preset) => (
-                <Button
-                  key={preset}
-                  type="button"
-                  variant={activePreset === preset ? "default" : "outline"}
-                  size="xs"
-                  onClick={() => applyPreset(preset)}
-                >
-                  <Sparkles className="mr-1 h-3 w-3" />
-                  {preset}
-                </Button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -351,39 +306,6 @@ export default function IndoorTemperaturePage() {
                 </div>
               </div>
 
-              {/* Time Parameters */}
-              <div>
-                <div className="mb-3 border-b border-border pb-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    2. Temporal Context
-                  </h2>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Month (1-12)" required>
-                    <select
-                      className="w-full rounded-none border border-input bg-background px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
-                      value={form.month}
-                      onChange={(e) => updateField("month", e.target.value)}
-                    >
-                      {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-                        <option key={month} value={month}>{month}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Hour of Day (0-23)" required>
-                    <select
-                      className="w-full rounded-none border border-input bg-background px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
-                      value={form.hour}
-                      onChange={(e) => updateField("hour", e.target.value)}
-                    >
-                      {Array.from({ length: 24 }, (_, hour) => (
-                        <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
-              </div>
-
               {/* Environmental In-Situ */}
               <div>
                 <div className="mb-3 border-b border-border pb-2">
@@ -391,7 +313,8 @@ export default function IndoorTemperaturePage() {
                     3. Ambient Environment (Auto-Filled)
                   </h2>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <label className="mb-4 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={showOptionalClimate} onChange={(e) => setShowOptionalClimate(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />Add environmental details manually</label>
+                {showOptionalClimate && <div className="grid grid-cols-3 gap-3">
                   <Field label="Outdoor Temp (°C)">
                     <Input
                       type="number"
@@ -419,7 +342,7 @@ export default function IndoorTemperaturePage() {
                       onChange={(e) => updateField("GHI_W_m2", e.target.value)}
                     />
                   </Field>
-                </div>
+                </div>}
               </div>
 
               {/* Envelope Specifications */}
@@ -521,7 +444,7 @@ export default function IndoorTemperaturePage() {
                   </div>
                   <h3 className="text-sm font-semibold text-foreground">Awaiting Execution</h3>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Submit the shelter parameters or select a preset to view predicted indoor temperature and comfort band analysis.
+                    Submit the shelter parameters to view predicted indoor temperature and comfort band analysis.
                   </p>
                 </div>
               ) : (
@@ -581,7 +504,7 @@ export default function IndoorTemperaturePage() {
                       Edit inputs / try another location
                     </Button>
                     <Link
-                      href={`/dashboard?location=${encodeURIComponent(activePreset)}&outdoor_temp_c=${form.outdoor_temperature_C}`}
+                      href={`/dashboard?outdoor_temp_c=${form.outdoor_temperature_C}`}
                       className="inline-flex items-center gap-1.5 text-xs font-mono text-accent hover:underline"
                     >
                       Compare in Results Dashboard →

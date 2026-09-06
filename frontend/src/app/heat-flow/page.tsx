@@ -10,7 +10,6 @@ import {
   Loader2,
   RefreshCw,
   Sliders,
-  Sparkles,
   Sun,
   Zap,
 } from "lucide-react";
@@ -84,7 +83,6 @@ const DEFAULT_HEAT_FLOW_PARAMS: HeatFlowRequest = {
 };
 
 export default function HeatFlowPage() {
-  const [selectedPreset, setSelectedPreset] = useState("Leh");
   const [selectedHour, setSelectedHour] = useState(12); // Default to Solar Noon
 
   // Parameters form state
@@ -143,25 +141,6 @@ export default function HeatFlowPage() {
     };
   }, [fetchHeatFlow]);
 
-  const handleApplyPreset = (presetId: string) => {
-    const p = PRESET_OPTIONS.find((item) => item.id === presetId);
-    if (!p) return;
-    setSelectedPreset(presetId);
-    const newParams: HeatFlowRequest = {
-      ...params,
-      latitude: p.lat,
-      longitude: p.lon,
-      wall_material: p.material,
-      wall_thickness_cm: p.thickness,
-      insulation_r_value: p.rValue,
-      glazing_ratio: p.glazing,
-      volume_m3: p.volume,
-      ambient_temp_c: p.ambient,
-    };
-    setParams(newParams);
-    fetchHeatFlow(newParams);
-  };
-
   const handleParamChange = (field: keyof HeatFlowRequest, value: string | number) => {
     setParams((prev) => ({
       ...prev,
@@ -211,7 +190,7 @@ export default function HeatFlowPage() {
                   Heat Flow &amp; 3D Shelter Visualizer
                 </h1>
                 <Badge variant="default" className="border border-accent/40 text-accent text-[10px]">
-                  Task 3 · SIH 26051
+                  Climate performance
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground">
@@ -220,23 +199,6 @@ export default function HeatFlowPage() {
             </div>
           </div>
 
-          {/* Quick Preset Selector */}
-          <div className="flex items-center gap-1.5">
-            <span className="hidden text-xs text-muted-foreground sm:inline">Preset:</span>
-            {PRESET_OPTIONS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => handleApplyPreset(p.id)}
-                className={`rounded-none px-2.5 py-1 text-xs font-medium transition-colors ${
-                  selectedPreset === p.id
-                    ? "bg-accent text-accent-foreground shadow-sm"
-                    : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                {p.id}
-              </button>
-            ))}
-          </div>
         </div>
       </header>
 
@@ -569,7 +531,7 @@ export default function HeatFlowPage() {
                   className="flex items-center justify-between rounded-none border border-border bg-background p-2.5 text-xs text-foreground transition-colors hover:border-accent"
                 >
                   <div className="flex items-center gap-2">
-                    <Sparkles size={14} className="text-[#4A6D88]" />
+                    <ArrowRight size={14} className="text-[#4A6D88]" />
                     <span>Optimization Dashboard</span>
                   </div>
                   <ArrowRight size={12} className="text-muted-foreground" />
