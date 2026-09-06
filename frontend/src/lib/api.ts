@@ -644,3 +644,6 @@ export const GOLDEN_PRESETS: Record<string, PresetLocation> = {
     },
   },
 };
+
+// ─── Heat Flow & 3D Visualization (SIH Task 3) ───────────────────────────────
+export * from "./api/heat-flow";

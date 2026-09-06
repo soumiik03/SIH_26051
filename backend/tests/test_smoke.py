@@ -263,3 +263,129 @@ def test_golden_case(client):
     assert data["status"] == "fallback"
     assert data["result"]["location"] == "Leh"
 
+
+def test_heat_flow_predict(client):
+    """Verify /predict/heat-flow calculates 24h envelope heat flow and geometry."""
+    payload = {
+        "latitude": 34.16,
+        "longitude": 77.58,
+        "month": 1,
+        "day": 15,
+        "volume_m3": 100.0,
+        "wall_material": "Stone",
+        "wall_thickness_cm": 30.0,
+        "insulation_r_value": 3.0,
+        "glazing_ratio": 0.25,
+        "occupancy": 4,
+        "heater_power_kw": 0.0,
+    }
+    response = client.post("/predict/heat-flow", json=payload)
+    assert response.status_code == 200, f"Failed: {response.text}"
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["indoor_temp_source"] in ["ml_model", "physics_fallback"]
+    assert "geometry" in data
+    assert "hourly_data" in data
+    assert "summary" in data
+
+    # Check U-values include walls, glazing, roof, floor
+    u_vals = data["u_values"]
+    assert u_vals["u_wall"] > 0
+    assert u_vals["u_glazing"] > 0
+    assert u_vals["u_roof"] > 0
+    assert u_vals["u_floor"] > 0
+
+    # Check geometry consistency
+    geom = data["geometry"]
+    assert geom["volume_m3"] == 100.0
+    assert geom["width_m"] > 3.0
+    assert geom["length_m"] > geom["width_m"]
+    assert geom["wall_height_m"] == 2.6
+    assert geom["wall_area_net_m2"] > 0
+    assert geom["glazing_area_m2"] > 0
+    assert geom["roof_area_m2"] > 0
+    assert geom["floor_area_m2"] > 0
+
+    # Check 24 hours of points
+    hourly = data["hourly_data"]
+    assert len(hourly) == 24
+    for pt in hourly:
+        assert 0 <= pt["hour"] <= 23
+        assert -90.0 <= pt["sun_elevation_deg"] <= 90.0
+        assert 0.0 <= pt["sun_azimuth_deg"] <= 360.0
+        assert pt["q_total_w"] >= 0
+        assert pt["q_roof_w"] >= 0
+        assert pt["q_floor_w"] >= 0
+        # Total heat loss must equal sum of wall, glazing, roof, floor
+        expected_q = round(pt["q_walls_w"] + pt["q_glazing_w"] + pt["q_roof_w"] + pt["q_floor_w"], 1)
+        assert abs(pt["q_total_w"] - expected_q) < 0.2
+        assert pt["heat_flow_direction"] in ["loss", "gain"]
+
+    # Confirm roof loss is non-trivial and a primary loss path
+    assert hourly[0]["q_roof_w"] > 100.0
+
+    summary = data["summary"]
+    assert summary["peak_heat_loss_w"] > 0
+    assert summary["total_heat_loss_kwh"] > 0
+    print(f"\n{'='*50}")
+    print(f"[Heat Flow] Indoor temp source: {data['indoor_temp_source']}")
+    print(f"[Heat Flow] Peak loss: {summary['peak_heat_loss_w']} W at hour {summary['peak_heat_loss_hour']}")
+    print(f"[Heat Flow] 24h Total loss: {summary['total_heat_loss_kwh']} kWh")
+    print(f"[Heat Flow] Avg indoor: {summary['average_indoor_temp_c']}°C, Avg outdoor: {summary['average_ambient_temp_c']}°C")
+
+
+def test_heat_flow_physics_direction(client):
+    """Verify that increasing insulation strictly decreases heat loss."""
+    base_payload = {
+        "latitude": 34.16,
+        "longitude": 77.58,
+        "month": 1,
+        "day": 15,
+        "volume_m3": 100.0,
+        "wall_material": "Stone",
+        "wall_thickness_cm": 30.0,
+        "glazing_ratio": 0.25,
+        "occupancy": 4,
+        "ambient_temp_c": -10.0,
+    }
+
+    low_ins_payload = {**base_payload, "insulation_r_value": 0.5}
+    high_ins_payload = {**base_payload, "insulation_r_value": 5.0}
+
+    res_low = client.post("/predict/heat-flow", json=low_ins_payload).json()
+    res_high = client.post("/predict/heat-flow", json=high_ins_payload).json()
+
+    # Low insulation should have higher U-value and higher total heat loss
+    assert res_low["u_values"]["u_wall"] > res_high["u_values"]["u_wall"]
+    # Total heat loss in kWh should be lower with high insulation
+    assert res_high["summary"]["total_heat_loss_kwh"] < res_low["summary"]["total_heat_loss_kwh"]
+
+
+def test_heat_flow_solar_tracking(client):
+    """Verify real solar position angles at midnight and midday for Leh."""
+    payload = {
+        "latitude": 34.16,
+        "longitude": 77.58,
+        "month": 1,
+        "day": 15,
+        "volume_m3": 100.0,
+    }
+    response = client.post("/predict/heat-flow", json=payload)
+    assert response.status_code == 200
+    hourly = response.json()["hourly_data"]
+
+    # Midnight (hour 0): sun must be below horizon
+    h0 = hourly[0]
+    assert h0["sun_elevation_deg"] < 0
+    assert not h0["is_sun_up"]
+    assert h0["ghi_w_m2"] == 0.0
+
+    # Solar noon (hour 12/13): sun must be well above horizon, roughly south (~180°)
+    h12 = hourly[12]
+    assert h12["sun_elevation_deg"] > 25.0
+    assert h12["is_sun_up"]
+    assert h12["ghi_w_m2"] > 200.0
+    assert 140.0 <= h12["sun_azimuth_deg"] <= 220.0
+    print(f"\n[Solar Tracking] Hour 12: Elevation={h12['sun_elevation_deg']}°, Azimuth={h12['sun_azimuth_deg']}°, GHI={h12['ghi_w_m2']} W/m²")
+
+

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Thermometer, Building2, Zap, ChartNoAxesCombined, ArrowRight, MapPin } from "lucide-react";
+import { Thermometer, Building2, Zap, ChartNoAxesCombined, ArrowRight, MapPin, Sun } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -67,6 +67,22 @@ const THERMAL_ENERGY_OUTPUTS = ["thermal_energy_kwh"];
 
 const DASHBOARD_INPUTS = ["location", "outdoor_temp_c", "design"];
 const DASHBOARD_OUTPUTS = ["24h indoor temperature", "Pareto front", "PDF report"];
+
+const HEAT_FLOW_INPUTS = [
+  "volume_m3",
+  "wall_material",
+  "wall_thickness_cm",
+  "insulation_r_value",
+  "glazing_ratio",
+  "month",
+  "hour",
+];
+const HEAT_FLOW_OUTPUTS = [
+  "24h envelope heat loss (Watts)",
+  "sun azimuth & elevation tracking",
+  "3D interactive thermal mesh",
+  "envelope U-values",
+];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -223,6 +239,15 @@ export default function Home() {
             description="Estimate hourly heating demand (kWh) for a shelter volume given its construction materials and climate conditions."
             inputs={THERMAL_ENERGY_INPUTS}
             outputs={THERMAL_ENERGY_OUTPUTS}
+          />
+
+          <ToolCard
+            href="/heat-flow"
+            icon={<Sun size={18} />}
+            title="Heat Flow & 3D Visualizer"
+            description="Task 3: Envelope heat loss details (Watts) per ambient-indoor temperature difference with real-time 3D solar tracking."
+            inputs={HEAT_FLOW_INPUTS}
+            outputs={HEAT_FLOW_OUTPUTS}
           />
 
           <ToolCard
