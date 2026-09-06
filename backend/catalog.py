@@ -4,16 +4,17 @@
 # Midpoints of the cited ranges, in ₹/m³: RCC 8,250; stone 5,250;
 # mud/adobe brick 3,000; rammed earth 2,000.
 MATERIAL_COSTS_INR_PER_M3 = {
-    "concrete": 8250,
-    "stone": 5250,
-    "mud_brick": 3000,
-    "rammed_earth": 2000,
+    "Concrete": 8250,
+    "Stone": 5250,
+    "Mud_Brick": 3000,
+    "Rammed_Earth": 2000,
 }
 
 MATERIALS = {
-    "brick": {"u_value": 1.6, "cost_per_m3_inr": MATERIAL_COSTS_INR_PER_M3["mud_brick"]},
-    "aac": {"u_value": 0.8, "cost_per_m3_inr": MATERIAL_COSTS_INR_PER_M3["rammed_earth"]},
-    "insulated_panel": {"u_value": 0.35, "cost_per_m3_inr": MATERIAL_COSTS_INR_PER_M3["concrete"]},
+    "Concrete": {"u_value": 1.4, "cost_per_m3_inr": MATERIAL_COSTS_INR_PER_M3["Concrete"]},
+    "Mud_Brick": {"u_value": 0.6, "cost_per_m3_inr": MATERIAL_COSTS_INR_PER_M3["Mud_Brick"]},
+    "Rammed_Earth": {"u_value": 0.9, "cost_per_m3_inr": MATERIAL_COSTS_INR_PER_M3["Rammed_Earth"]},
+    "Stone": {"u_value": 1.8, "cost_per_m3_inr": MATERIAL_COSTS_INR_PER_M3["Stone"]},
 }
 GLAZING = {
     "single": {"u_value": 5.6, "cost_per_m2_inr": 1800},

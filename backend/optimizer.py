@@ -2,7 +2,7 @@
 
 Finds the Pareto front balancing:
   1. Minimum daily heating energy demand (kWh)
-  2. Minimum capital installation cost ($)
+  2. Minimum capital installation cost (INR)
 
 Uses NSGA-II via pymoo when available, with a resilient vectorized Pareto
 grid solver fallback for guaranteed reliability in any environment.
@@ -120,7 +120,7 @@ def _pareto_grid_fallback(request: OptimizationRequest) -> list[dict]:
 
 
 def optimize(request: OptimizationRequest) -> list[dict]:
-    """Return non-dominated Pareto front trade-offs between energy and capital cost."""
+    """Return non-dominated Pareto front trade-offs between energy and INR cost."""
     if _HAS_PYMOO:
         try:
             problem = ThermalProblem(request)

@@ -35,7 +35,9 @@ COORDINATE_MAP = {
     "bengaluru": (12.97, 77.59),
 }
 
-# Mapping from catalog design materials to ML training classes
+# Mapping from verified wall categories to the separate indoor-temperature
+# model's known classes. Stone has no confirmed class in that model and uses
+# the physics fallback instead of being assigned a fabricated class.
 # indoor_temp classes:
 # 0: High-thermal-mass adobe walls with deep window overhangs...
 # 1: Rammed earth thermal mass with adjustable cross-ventilation flaps...
@@ -43,16 +45,9 @@ COORDINATE_MAP = {
 # 3: Sun-dried adobe bricks with 10cm straw-clay exterior jacket insulation...
 # 4: Super-insulated Rammed Earth (straw/clay cavity) + unvented Trombe wall...
 INDOOR_MATERIAL_INDEX = {
-    "brick": 3,
-    "aac": 2,
-    "insulated_panel": 4,
-}
-
-# thermal_energy classes: ['Concrete', 'Mud_Brick', 'Rammed_Earth', 'Stone']
-THERMAL_ENERGY_MATERIAL_NAME = {
-    "brick": "Mud_Brick",
-    "aac": "Rammed_Earth",
-    "insulated_panel": "Concrete",
+    "Mud_Brick": 3,
+    "Rammed_Earth": 2,
+    "Concrete": 4,
 }
 
 GLAZING_RATIO_MAP = {
@@ -107,10 +102,12 @@ def predict_indoor_temperature(
         if model is not None and scaler is not None and features:
             u = envelope_u_value(selected)
             r_val = 1.0 / max(0.01, u)
-            mat_idx = INDOOR_MATERIAL_INDEX.get(selected.material, 3)
+            if selected.material not in INDOOR_MATERIAL_INDEX:
+                raise ValueError("No verified indoor-temperature class for this wall material")
+            mat_idx = INDOOR_MATERIAL_INDEX[selected.material]
             glaze_val = GLAZING_RATIO_MAP.get(selected.glazing, 0.25)
-            # Higher thermal mass for solid brick / earth
-            t_mass = 2.4 if selected.material == "brick" else 1.8
+            # Higher thermal mass for solid masonry / earth.
+            t_mass = 2.4 if selected.material in {"Mud_Brick", "Stone"} else 1.8
 
             rows = []
             outdoor_temps = []
@@ -196,9 +193,8 @@ def predict_daily_heating_kwh(
 ) -> float:
     """Predict daily heating demand using the shared four-part envelope model."""
     selected = design or request.design
-    material_key = {"brick": "mud_brick", "aac": "rammed_earth", "insulated_panel": "concrete"}[selected.material]
     insulation_r = selected.insulation_mm / 1000.0 / 0.035
-    u_values = calculate_u_values(material_key, 30.0, insulation_r)
+    u_values = calculate_u_values(selected.material, 30.0, insulation_r)
     areas = calculate_shelter_areas(selected.area_m2 * 2.8, GLAZING_RATIO_MAP[selected.glazing])
 
     total_wh = 0.0

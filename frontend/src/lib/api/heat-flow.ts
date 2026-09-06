@@ -159,12 +159,12 @@ export function generateClientFallback(req: HeatFlowRequest): HeatFlowResponse {
   const roofArea = Math.round(((width * length) / Math.cos(Math.PI / 6)) * 100) / 100;
 
   const matK: Record<string, number> = {
-    stone: 1.8,
-    rammed_earth: 0.9,
-    mud_brick: 0.6,
-    concrete: 1.4,
+    Concrete: 1.4,
+    Mud_Brick: 0.6,
+    Rammed_Earth: 0.9,
+    Stone: 1.8,
   };
-  const k = matK[req.wall_material.toLowerCase().replace(" ", "_")] ?? 1.2;
+  const k = matK[req.wall_material] ?? 1.2;
   const rMat = (req.wall_thickness_cm / 100) / k;
   const rTotal = rMat + req.insulation_r_value + 0.17;
   const uWall = Math.round((1 / rTotal) * 1000) / 1000;
@@ -297,4 +297,3 @@ export function generateClientFallback(req: HeatFlowRequest): HeatFlowResponse {
     },
   };
 }
-

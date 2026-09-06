@@ -50,10 +50,10 @@ router = APIRouter(tags=["Heat Flow & 3D Visualization"])
 # Conductivity in W/(m·K)
 # Thermal mass in MJ/(m3·K)
 MATERIAL_THERMAL_MASS: Dict[str, float] = {
-    "stone": 2.2,
-    "rammed_earth": 1.9,
-    "mud_brick": 1.6,
-    "concrete": 2.0,
+    "Stone": 2.2,
+    "Rammed_Earth": 1.9,
+    "Mud_Brick": 1.6,
+    "Concrete": 2.0,
 }
 
 
@@ -196,8 +196,11 @@ def predict_heat_flow(payload: HeatFlowRequest):
 
     # 4. Predict indoor temperature for all 24 hours
     wind_spd = payload.wind_speed_mps if payload.wind_speed_mps is not None else 2.5
-    mat_key = payload.wall_material.strip().lower().replace(" ", "_")
-    thermal_mass = MATERIAL_THERMAL_MASS.get(mat_key, 2.0)
+    thermal_mass = next(
+        (value for name, value in MATERIAL_THERMAL_MASS.items()
+         if name.lower() == payload.wall_material.strip().lower()),
+        2.0,
+    )
 
     indoor_temps = []
     ml_used = False

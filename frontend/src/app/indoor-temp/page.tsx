@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { COMFORT_BASIS, COMFORT_LOWER_BOUND_C } from "@/lib/constants"
 
 type FormState = {
   latitude: string
@@ -61,18 +62,18 @@ const MATERIAL_OPTIONS = [
 ]
 
 function getComfortStatus(temperature: number) {
-  if (temperature < 15) {
+  if (temperature < COMFORT_LOWER_BOUND_C - 4) {
     return {
       label: "Cold (Heating Deficit)",
       color: "text-danger",
       badgeVariant: "danger" as const,
       description:
-        "Predicted temperature is below the 18°C passive comfort threshold. Auxiliary solar gain or thermal shutters recommended.",
+        `Predicted temperature is below the ${COMFORT_LOWER_BOUND_C.toFixed(1)}°C comfort threshold. Auxiliary solar gain or thermal shutters recommended.`,
       percentage: Math.max(0, Math.min(100, ((temperature - (-10)) / 40) * 100)),
     }
   }
 
-  if (temperature < 18) {
+  if (temperature < COMFORT_LOWER_BOUND_C) {
     return {
       label: "Cool (Borderline)",
       color: "text-warning",
@@ -83,25 +84,18 @@ function getComfortStatus(temperature: number) {
     }
   }
 
-  if (temperature <= 24) {
+  if (temperature >= COMFORT_LOWER_BOUND_C) {
     return {
       label: "Optimal Comfort Zone",
       color: "text-success",
       badgeVariant: "success" as const,
       description:
-        "Falls squarely within the ASHRAE 55 cold-climate passive survivability comfort band (18°C–24°C).",
+        `Meets the ${COMFORT_LOWER_BOUND_C.toFixed(1)}°C lower comfort bound defined by ${COMFORT_BASIS}.`,
       percentage: Math.max(0, Math.min(100, ((temperature - (-10)) / 40) * 100)),
     }
   }
 
-  return {
-    label: "Warm / Solar Surplus",
-    color: "text-accent",
-    badgeVariant: "accent" as const,
-    description:
-      "Temperature exceeds 24°C due to high solar radiation gain. Operable vent flaps recommended for heat rejection.",
-    percentage: Math.max(0, Math.min(100, ((temperature - (-10)) / 40) * 100)),
-  }
+  return null
 }
 
 function optionalNumber(value: string): number | undefined {
@@ -551,6 +545,9 @@ export default function IndoorTemperaturePage() {
                       <span>COMFORT BAND GAUGE</span>
                       <span className={comfort?.color}>{comfort?.label}</span>
                     </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Comfort basis: {COMFORT_BASIS}; lower bound {COMFORT_LOWER_BOUND_C.toFixed(1)}°C
+                    </p>
 
                     {/* Gradient Bar */}
                     <div className="relative h-3 w-full rounded-none bg-gradient-to-r from-danger via-warning via-success to-accent">
@@ -563,7 +560,7 @@ export default function IndoorTemperaturePage() {
 
                     <div className="flex justify-between text-[10px] font-mono text-muted-foreground/80 pt-1">
                       <span>-10°C (Freeze)</span>
-                      <span>18°C–24°C (Comfort)</span>
+                      <span>{COMFORT_LOWER_BOUND_C.toFixed(1)}°C+ (Comfort)</span>
                       <span>30°C</span>
                     </div>
                   </div>
@@ -572,7 +569,7 @@ export default function IndoorTemperaturePage() {
                   <div className="rounded-none border border-border bg-muted/20 p-4 space-y-2">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-semibold text-foreground">Passive Habitability</span>
+                      <span className="text-xs font-semibold text-foreground">Comfort Assessment</span>
                     </div>
                     <p className="text-xs leading-relaxed text-muted-foreground">
                       {comfort?.description}

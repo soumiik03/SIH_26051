@@ -514,7 +514,7 @@ export default function ThermalEnergyPage() {
                       <span className="text-xs font-semibold text-foreground">High Thermal Retention</span>
                     </div>
                     <p className="text-xs leading-relaxed text-muted-foreground">
-                      Continuous straw-clay or insulated panel exterior jackets can reduce this heating load by up to 48%.
+                      Higher-insulation materials generally reduce heating load. Use the Design flow or Dashboard to compare alternatives with the model.
                     </p>
                   </div>
 

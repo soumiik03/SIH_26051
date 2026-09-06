@@ -41,9 +41,10 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { COMFORT_BASIS, COMFORT_LOWER_BOUND_C } from "@/lib/constants"
 
 const DEFAULT_DESIGN: ShelterDesign = {
-  material: "insulated_panel",
+  material: "Concrete",
   insulation_mm: 150,
   glazing: "low_e",
   area_m2: 85,
@@ -101,7 +102,7 @@ function DashboardContent() {
       outdoor_temp_c: temp,
       solar_kwh_m2: GOLDEN_PRESETS[loc]?.climate.ghi_kwh_m2_day ?? 5.4,
       occupants: 4,
-      target_temp_c: 21.0,
+      target_temp_c: COMFORT_LOWER_BOUND_C,
       population_size: 40,
       generations: 30,
       design: currentDesign,
@@ -182,7 +183,7 @@ function DashboardContent() {
     pdf.setTextColor(60, 70, 80)
     pdf.text(`Geographic Location: ${location} (High-Altitude Cold Arid)`, 18, 50)
     pdf.text(`Outdoor Ambient Temp: ${outdoorTemp}°C`, 18, 57)
-    pdf.text(`Indoor Target Comfort: 21.0°C (ASHRAE 55 Cold-Climate)`, 18, 64)
+    pdf.text(`Indoor Target Comfort: ${COMFORT_LOWER_BOUND_C.toFixed(1)}°C (${COMFORT_BASIS})`, 18, 64)
 
     pdf.text(`Shelter Material: ${design.material.toUpperCase()}`, 110, 50)
     pdf.text(`Insulation Thickness: ${design.insulation_mm} mm`, 110, 57)
@@ -200,9 +201,9 @@ function DashboardContent() {
 
     const statsData = [
       { label: "Min Indoor Temp", value: `${baseline.comfort.minimum_indoor_c}°C` },
-      { label: "Hours < 21°C Target", value: `${baseline.comfort.hours_below_target} / 24h` },
+      { label: `Hours < ${COMFORT_LOWER_BOUND_C.toFixed(1)}°C Target`, value: `${baseline.comfort.hours_below_target} / 24h` },
       { label: "Daily Heating", value: `${baseline.thermal_energy.daily_heating_kwh} kWh` },
-      { label: "Capital Install Cost", value: `$${baseline.cost.estimated_install_cost.toLocaleString()}` },
+      { label: "Capital Install Cost", value: `₹${baseline.cost.estimated_install_cost.toLocaleString()}` },
     ]
 
     statsData.forEach((stat, idx) => {
@@ -232,7 +233,7 @@ function DashboardContent() {
     pdf.setFontSize(8)
     pdf.setTextColor(100, 110, 120)
     pdf.text(
-      "Non-dominated trade-offs balancing minimum heating demand (kWh) versus capital construction cost ($):",
+      "Non-dominated trade-offs balancing minimum heating demand (kWh) versus capital construction cost (₹):",
       14,
       126
     )
@@ -249,7 +250,7 @@ function DashboardContent() {
     pdf.text("Insulation", 75, tableY + 5.5)
     pdf.text("Glazing", 110, tableY + 5.5)
     pdf.text("Daily Heating (kWh)", 140, tableY + 5.5)
-    pdf.text("Install Cost ($)", 175, tableY + 5.5)
+    pdf.text("Install Cost (₹)", 175, tableY + 5.5)
 
     // Table Rows
     const rows = result.pareto_front.slice(0, 5)
@@ -267,7 +268,7 @@ function DashboardContent() {
       pdf.text(`${p.design.insulation_mm} mm`, 75, y + 5.5)
       pdf.text(p.design.glazing.toUpperCase(), 110, y + 5.5)
       pdf.text(`${p.daily_heating_kwh} kWh`, 140, y + 5.5)
-      pdf.text(`$${p.estimated_install_cost.toLocaleString()}`, 175, y + 5.5)
+      pdf.text(`₹${p.estimated_install_cost.toLocaleString()}`, 175, y + 5.5)
     })
 
     // Footer Watermark
@@ -359,9 +360,10 @@ function DashboardContent() {
                   setDesign({ ...design, material: e.target.value as ShelterDesign["material"] })
                 }
               >
-                <option value="brick">Adobe / Brick</option>
-                <option value="aac">Rammed Earth / AAC</option>
-                <option value="insulated_panel">Insulated Panel</option>
+                <option value="Concrete">Concrete</option>
+                <option value="Mud_Brick">Mud Brick / Adobe</option>
+                <option value="Rammed_Earth">Rammed Earth</option>
+                <option value="Stone">Stone</option>
               </select>
             </div>
 
@@ -454,7 +456,7 @@ function DashboardContent() {
                   <span className="text-sm font-mono text-muted-foreground">°C</span>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Target: 21°C ASHRAE passive threshold
+                  Target: {COMFORT_LOWER_BOUND_C.toFixed(1)}°C {COMFORT_BASIS}
                 </p>
               </Card>
 
@@ -494,7 +496,7 @@ function DashboardContent() {
                 </span>
                 <div className="mt-1 flex items-baseline gap-1">
                   <span className="data-value text-3xl font-bold text-accent">
-                    ${result.baseline.cost.estimated_install_cost.toLocaleString()}
+                    ₹{result.baseline.cost.estimated_install_cost.toLocaleString()}
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
@@ -671,7 +673,7 @@ function DashboardContent() {
                           {point.daily_heating_kwh} kWh
                         </td>
                         <td className="p-3 font-mono text-accent">
-                          ${point.estimated_install_cost.toLocaleString()}
+                          ₹{point.estimated_install_cost.toLocaleString()}
                         </td>
                         <td className="p-3 text-right space-x-2">
                           <Button

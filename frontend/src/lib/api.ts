@@ -4,6 +4,8 @@
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
+import { COMFORT_LOWER_BOUND_C } from "./constants";
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
@@ -184,7 +186,7 @@ export async function predictThermalEnergy(
 // ─── Chapter 3: Optimization & Results Dashboard ──────────────────────────────
 
 export interface ShelterDesign {
-  material: "brick" | "aac" | "insulated_panel";
+  material: "Concrete" | "Mud_Brick" | "Rammed_Earth" | "Stone";
   insulation_mm: number;
   glazing: "single" | "double" | "low_e";
   area_m2: number;
@@ -333,16 +335,16 @@ export const GOLDEN_PRESETS: Record<string, PresetLocation> = {
           outdoor_temp_c: -6.0,
           solar_kwh_m2: 5.4,
           occupants: 4,
-          target_temp_c: 21.0,
+          target_temp_c: COMFORT_LOWER_BOUND_C,
           design: {
-            material: "insulated_panel",
+            material: "Concrete",
             insulation_mm: 150,
             glazing: "low_e",
             area_m2: 85,
           },
         },
         design: {
-          material: "insulated_panel",
+          material: "Concrete",
           insulation_mm: 150,
           glazing: "low_e",
           area_m2: 85,
@@ -387,22 +389,22 @@ export const GOLDEN_PRESETS: Record<string, PresetLocation> = {
       },
       pareto_front: [
         {
-          design: { material: "brick", insulation_mm: 50, glazing: "single", area_m2: 85 },
+          design: { material: "Mud_Brick", insulation_mm: 50, glazing: "single", area_m2: 85 },
           daily_heating_kwh: 84.5,
           estimated_install_cost: 6520.0,
         },
         {
-          design: { material: "aac", insulation_mm: 90, glazing: "double", area_m2: 85 },
+          design: { material: "Rammed_Earth", insulation_mm: 90, glazing: "double", area_m2: 85 },
           daily_heating_kwh: 36.2,
           estimated_install_cost: 9840.0,
         },
         {
-          design: { material: "insulated_panel", insulation_mm: 120, glazing: "double", area_m2: 85 },
+          design: { material: "Concrete", insulation_mm: 120, glazing: "double", area_m2: 85 },
           daily_heating_kwh: 22.1,
           estimated_install_cost: 12950.0,
         },
         {
-          design: { material: "insulated_panel", insulation_mm: 160, glazing: "low_e", area_m2: 85 },
+          design: { material: "Concrete", insulation_mm: 160, glazing: "low_e", area_m2: 85 },
           daily_heating_kwh: 15.4,
           estimated_install_cost: 15640.0,
         },
@@ -455,16 +457,16 @@ export const GOLDEN_PRESETS: Record<string, PresetLocation> = {
           outdoor_temp_c: -14.0,
           solar_kwh_m2: 4.8,
           occupants: 4,
-          target_temp_c: 21.0,
+          target_temp_c: COMFORT_LOWER_BOUND_C,
           design: {
-            material: "insulated_panel",
+            material: "Concrete",
             insulation_mm: 200,
             glazing: "low_e",
             area_m2: 75,
           },
         },
         design: {
-          material: "insulated_panel",
+          material: "Concrete",
           insulation_mm: 200,
           glazing: "low_e",
           area_m2: 75,
@@ -509,17 +511,17 @@ export const GOLDEN_PRESETS: Record<string, PresetLocation> = {
       },
       pareto_front: [
         {
-          design: { material: "aac", insulation_mm: 100, glazing: "double", area_m2: 75 },
+          design: { material: "Rammed_Earth", insulation_mm: 100, glazing: "double", area_m2: 75 },
           daily_heating_kwh: 58.4,
           estimated_install_cost: 9200.0,
         },
         {
-          design: { material: "insulated_panel", insulation_mm: 150, glazing: "double", area_m2: 75 },
+          design: { material: "Concrete", insulation_mm: 150, glazing: "double", area_m2: 75 },
           daily_heating_kwh: 34.2,
           estimated_install_cost: 13800.0,
         },
         {
-          design: { material: "insulated_panel", insulation_mm: 200, glazing: "low_e", area_m2: 75 },
+          design: { material: "Concrete", insulation_mm: 200, glazing: "low_e", area_m2: 75 },
           daily_heating_kwh: 23.8,
           estimated_install_cost: 17400.0,
         },
@@ -572,16 +574,16 @@ export const GOLDEN_PRESETS: Record<string, PresetLocation> = {
           outdoor_temp_c: -8.0,
           solar_kwh_m2: 5.1,
           occupants: 3,
-          target_temp_c: 21.0,
+          target_temp_c: COMFORT_LOWER_BOUND_C,
           design: {
-            material: "aac",
+            material: "Rammed_Earth",
             insulation_mm: 120,
             glazing: "double",
             area_m2: 80,
           },
         },
         design: {
-          material: "aac",
+          material: "Rammed_Earth",
           insulation_mm: 120,
           glazing: "double",
           area_m2: 80,
@@ -626,17 +628,17 @@ export const GOLDEN_PRESETS: Record<string, PresetLocation> = {
       },
       pareto_front: [
         {
-          design: { material: "brick", insulation_mm: 60, glazing: "single", area_m2: 80 },
+          design: { material: "Mud_Brick", insulation_mm: 60, glazing: "single", area_m2: 80 },
           daily_heating_kwh: 72.0,
           estimated_install_cost: 6200.0,
         },
         {
-          design: { material: "aac", insulation_mm: 100, glazing: "double", area_m2: 80 },
+          design: { material: "Rammed_Earth", insulation_mm: 100, glazing: "double", area_m2: 80 },
           daily_heating_kwh: 29.5,
           estimated_install_cost: 10100.0,
         },
         {
-          design: { material: "insulated_panel", insulation_mm: 140, glazing: "low_e", area_m2: 80 },
+          design: { material: "Concrete", insulation_mm: 140, glazing: "low_e", area_m2: 80 },
           daily_heating_kwh: 17.2,
           estimated_install_cost: 14200.0,
         },

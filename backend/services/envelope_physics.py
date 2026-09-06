@@ -8,14 +8,10 @@ from dataclasses import dataclass
 
 
 MATERIAL_CONDUCTIVITY = {
-    "stone": 1.8,
-    "rammed_earth": 0.9,
-    "mud_brick": 0.6,
-    "concrete": 1.4,
-    # Optimizer/catalog aliases.
-    "brick": 0.6,
-    "aac": 0.9,
-    "insulated_panel": 1.4,
+    "Concrete": 1.4,
+    "Mud_Brick": 0.6,
+    "Rammed_Earth": 0.9,
+    "Stone": 1.8,
 }
 
 
@@ -54,8 +50,11 @@ def calculate_u_values(
     insulation_r_value: float,
 ) -> EnvelopeUValues:
     """Return the validated Chapter 6.5 wall/roof/floor U-values."""
-    mat_key = wall_material.strip().lower().replace(" ", "_")
-    k = MATERIAL_CONDUCTIVITY.get(mat_key, 1.2)
+    canonical_name = next(
+        (name for name in MATERIAL_CONDUCTIVITY if name.lower() == wall_material.strip().lower()),
+        "Stone",
+    )
+    k = MATERIAL_CONDUCTIVITY[canonical_name]
     d_m = max(0.05, wall_thickness_cm / 100.0)
 
     r_mat = d_m / k

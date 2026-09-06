@@ -19,6 +19,7 @@ if str(BACKEND_DIR) not in sys.path:
 import pytest
 from fastapi.testclient import TestClient
 from main import app
+from optimization_schemas import COMFORT_LOWER_BOUND_C
 
 # Load metadata so we can use valid class values in test payloads
 MODELS_DIR = BACKEND_DIR / "models"
@@ -209,9 +210,9 @@ def test_optimization_run(client):
         "outdoor_temp_c": -6.0,
         "solar_kwh_m2": 5.4,
         "occupants": 4,
-        "target_temp_c": 21.0,
+        "target_temp_c": COMFORT_LOWER_BOUND_C,
         "design": {
-            "material": "insulated_panel",
+            "material": "Concrete",
             "insulation_mm": 100.0,
             "glazing": "double",
             "area_m2": 90.0,
@@ -235,9 +236,9 @@ def test_optimization_dashboard(client):
         "outdoor_temp_c": -6.0,
         "solar_kwh_m2": 5.4,
         "occupants": 4,
-        "target_temp_c": 21.0,
+        "target_temp_c": COMFORT_LOWER_BOUND_C,
         "design": {
-            "material": "insulated_panel",
+            "material": "Concrete",
             "insulation_mm": 100.0,
             "glazing": "double",
             "area_m2": 90.0,
@@ -266,8 +267,7 @@ def test_optimization_dashboard(client):
     point = data["pareto_front"][0]
     design = Design(**point["design"])
     direct_request = AnalysisRequest(**payload)
-    material_key = {"brick": "mud_brick", "aac": "rammed_earth", "insulated_panel": "concrete"}[design.material]
-    u_values = calculate_u_values(material_key, 30.0, design.insulation_mm / 1000.0 / 0.035)
+    u_values = calculate_u_values(design.material, 30.0, design.insulation_mm / 1000.0 / 0.035)
     areas = calculate_shelter_areas(design.area_m2 * 2.8, {"single": 0.15, "double": 0.25, "low_e": 0.35}[design.glazing])
     expected_wh = 0.0
     import math
@@ -279,6 +279,34 @@ def test_optimization_dashboard(client):
         )["total"]
     assert point["daily_heating_kwh"] == round(expected_wh / 1000.0, 2)
     assert predict_daily_heating_kwh(direct_request, design) == point["daily_heating_kwh"]
+
+
+def test_optimizer_heating_is_monotonic_with_insulation():
+    """Increasing insulation must not increase heating demand for any material."""
+    from optimization_schemas import Design, OptimizationRequest
+    from predictors import predict_daily_heating_kwh
+    from catalog import MATERIALS
+
+    assert set(MATERIALS) == {"Concrete", "Mud_Brick", "Rammed_Earth", "Stone"}
+
+    request = OptimizationRequest(
+        location="Leh",
+        outdoor_temp_c=-6.0,
+        solar_kwh_m2=5.4,
+        occupants=4,
+        target_temp_c=19.6,
+        design=Design(material="Mud_Brick", insulation_mm=0, glazing="double", area_m2=85),
+    )
+    for material in ("Concrete", "Mud_Brick", "Rammed_Earth", "Stone"):
+        values = [
+            predict_daily_heating_kwh(
+                request,
+                Design(material=material, insulation_mm=insulation, glazing="double", area_m2=85),
+            )
+            for insulation in (0, 50, 100, 150, 200, 250)
+        ]
+        print(f"[Optimizer monotonicity] {material}: {values}")
+        assert values == sorted(values, reverse=True)
 
 
 def test_golden_case(client):
@@ -413,4 +441,3 @@ def test_heat_flow_solar_tracking(client):
     assert h12["ghi_w_m2"] > 200.0
     assert 140.0 <= h12["sun_azimuth_deg"] <= 220.0
     print(f"\n[Solar Tracking] Hour 12: Elevation={h12['sun_elevation_deg']}°, Azimuth={h12['sun_azimuth_deg']}°, GHI={h12['ghi_w_m2']} W/m²")
-
