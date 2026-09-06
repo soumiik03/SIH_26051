@@ -46,7 +46,7 @@ export function HeatFlowChart({
   const maxTemp = Math.ceil(Math.max(...allTemps) + 4);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div className="rounded-none border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-foreground">
@@ -78,16 +78,16 @@ export function HeatFlowChart({
           >
             <defs>
               <linearGradient id="qLossGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.02} />
+                <stop offset="5%" stopColor="#A63D2F" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#A63D2F" stopOpacity={0.03} />
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#D9D0BF" opacity={0.7} />
 
             <XAxis
               dataKey="hourLabel"
-              stroke="#64748b"
+              stroke="#685E55"
               fontSize={11}
               tickLine={false}
               interval={2}
@@ -97,7 +97,7 @@ export function HeatFlowChart({
             <YAxis
               yAxisId="temp"
               domain={[minTemp, maxTemp]}
-              stroke="#64748b"
+              stroke="#685E55"
               fontSize={11}
               tickLine={false}
               unit="°C"
@@ -107,7 +107,7 @@ export function HeatFlowChart({
             <YAxis
               yAxisId="heat"
               orientation="right"
-              stroke="#f43f5e"
+              stroke="#A63D2F"
               fontSize={11}
               tickLine={false}
               unit="W"
@@ -118,21 +118,21 @@ export function HeatFlowChart({
                 if (active && payload && payload.length) {
                   const data = payload[0].payload;
                   return (
-                    <div className="rounded-lg border border-border bg-popover/95 p-3 text-xs shadow-xl backdrop-blur-md">
+                    <div className="rounded-none border border-border bg-card p-3 text-xs shadow-md">
                       <p className="border-b border-border pb-1 font-mono font-bold text-foreground">
                         {data.hourLabel} IST · ΔT: {data.deltaT} K
                       </p>
                       <div className="mt-2 space-y-1">
-                        <p className="text-emerald-400">
+                        <p className="text-[#B65C38] font-medium">
                           Indoor Temp: <strong>{data.indoorTemp}°C</strong>
                         </p>
-                        <p className="text-sky-400">
+                        <p className="text-[#4A6D88] font-medium">
                           Ambient Temp: <strong>{data.ambientTemp}°C</strong>
                         </p>
-                        <p className="text-amber-400">
+                        <p className="text-[#B87326] font-medium">
                           Solar GHI: <strong>{data.ghi} W/m²</strong>
                         </p>
-                        <div className="mt-1 border-t border-border/60 pt-1 text-rose-400">
+                        <div className="mt-1 border-t border-border pt-1 text-[#A63D2F]">
                           <p>
                             Total Heat Loss: <strong>{data.qTotal.toLocaleString()} W</strong>
                           </p>
@@ -158,13 +158,13 @@ export function HeatFlowChart({
             <ReferenceLine
               yAxisId="temp"
               x={`${selectedHour < 10 ? `0${selectedHour}` : selectedHour}:00`}
-              stroke="#38bdf8"
+              stroke="#4A6D88"
               strokeWidth={2}
               strokeDasharray="3 3"
               label={{
                 value: "Current",
                 position: "top",
-                fill: "#38bdf8",
+                fill: "#4A6D88",
                 fontSize: 10,
               }}
             />
@@ -175,7 +175,7 @@ export function HeatFlowChart({
               type="monotone"
               dataKey="qTotal"
               name="Heat Loss (W)"
-              stroke="#f43f5e"
+              stroke="#A63D2F"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#qLossGradient)"
@@ -187,7 +187,7 @@ export function HeatFlowChart({
               type="monotone"
               dataKey="indoorTemp"
               name="Indoor Temp (°C)"
-              stroke="#10b981"
+              stroke="#B65C38"
               strokeWidth={2.5}
               dot={false}
             />
@@ -198,7 +198,7 @@ export function HeatFlowChart({
               type="monotone"
               dataKey="ambientTemp"
               name="Ambient Temp (°C)"
-              stroke="#38bdf8"
+              stroke="#4A6D88"
               strokeWidth={2}
               strokeDasharray="4 4"
               dot={false}

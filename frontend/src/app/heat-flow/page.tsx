@@ -1,25 +1,17 @@
 "use client";
 
-import React, { useEffect, useState, useTransition } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Compass,
   Flame,
-  Info,
   Layers,
   Loader2,
-  MapPin,
   RefreshCw,
   Sliders,
   Sparkles,
   Sun,
-  Thermometer,
   Zap,
 } from "lucide-react";
 import {
@@ -29,7 +21,6 @@ import {
   HourlyHeatFlowPoint,
   generateClientFallback,
 } from "@/lib/api/heat-flow";
-import { GOLDEN_PRESETS } from "@/lib/api";
 import { Dynamic3DView } from "@/components/heat-flow/Dynamic3DView";
 import { TimeScrubber } from "@/components/heat-flow/TimeScrubber";
 import { HeatFlowChart } from "@/components/heat-flow/HeatFlowChart";
@@ -77,57 +68,33 @@ const PRESET_OPTIONS = [
   },
 ];
 
+const DEFAULT_HEAT_FLOW_PARAMS: HeatFlowRequest = {
+  latitude: 34.16,
+  longitude: 77.58,
+  month: 1,
+  day: 15,
+  volume_m3: 100.0,
+  wall_material: "Stone",
+  wall_thickness_cm: 30.0,
+  insulation_r_value: 3.0,
+  glazing_ratio: 0.25,
+  occupancy: 4,
+  heater_power_kw: 0.0,
+  ambient_temp_c: -6.0,
+};
+
 export default function HeatFlowPage() {
   const [selectedPreset, setSelectedPreset] = useState("Leh");
   const [selectedHour, setSelectedHour] = useState(12); // Default to Solar Noon
 
   // Parameters form state
-  const [params, setParams] = useState<HeatFlowRequest>({
-    latitude: 34.16,
-    longitude: 77.58,
-    month: 1,
-    day: 15,
-    volume_m3: 100.0,
-    wall_material: "Stone",
-    wall_thickness_cm: 30.0,
-    insulation_r_value: 3.0,
-    glazing_ratio: 0.25,
-    occupancy: 4,
-    heater_power_kw: 0.0,
-    ambient_temp_c: -6.0,
-  });
+  const [params, setParams] = useState<HeatFlowRequest>(DEFAULT_HEAT_FLOW_PARAMS);
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<HeatFlowResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
-  // Initial load & prefill check
-  useEffect(() => {
-    // Check if there is a prefill from previous flows
-    const stored = sessionStorage.getItem("thermal-design-result");
-    if (stored) {
-      try {
-        const design = JSON.parse(stored);
-        if (design.wall_thickness_cm) {
-          setParams((prev) => ({
-            ...prev,
-            wall_material: design.material_name ?? prev.wall_material,
-            wall_thickness_cm: Number(design.wall_thickness_cm) || prev.wall_thickness_cm,
-            glazing_ratio: Number(design.glazing_ratio) || prev.glazing_ratio,
-            insulation_r_value: Number(design.insulation_r_value) || prev.insulation_r_value,
-          }));
-        }
-      } catch {
-        // ignore invalid json
-      }
-    }
-    fetchHeatFlow(params);
-  }, []);
-
-  const fetchHeatFlow = async (req: HeatFlowRequest) => {
+  const fetchHeatFlow = useCallback(async (req: HeatFlowRequest) => {
     setLoading(true);
-    setError(null);
     try {
       const res = await predictHeatFlow(req);
       setData(res);
@@ -136,11 +103,45 @@ export default function HeatFlowPage() {
       console.warn("Backend unavailable, using client fallback:", err);
       const fallback = generateClientFallback(req);
       setData(fallback);
-      setError("Using offline high-precision physics simulation.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Initial load & prefill check
+  useEffect(() => {
+    let ignore = false;
+    let initialReq = DEFAULT_HEAT_FLOW_PARAMS;
+    try {
+      const stored = sessionStorage.getItem("thermal-design-result");
+      if (stored) {
+        const design = JSON.parse(stored);
+        if (design.wall_thickness_cm) {
+          initialReq = {
+            ...DEFAULT_HEAT_FLOW_PARAMS,
+            wall_material: design.material_name ?? DEFAULT_HEAT_FLOW_PARAMS.wall_material,
+            wall_thickness_cm: Number(design.wall_thickness_cm) || DEFAULT_HEAT_FLOW_PARAMS.wall_thickness_cm,
+            glazing_ratio: Number(design.glazing_ratio) || DEFAULT_HEAT_FLOW_PARAMS.glazing_ratio,
+            insulation_r_value: Number(design.insulation_r_value) || DEFAULT_HEAT_FLOW_PARAMS.insulation_r_value,
+          };
+        }
+      }
+    } catch {
+      // ignore invalid json or storage access
+    }
+
+    const timer = setTimeout(() => {
+      if (!ignore) {
+        setParams(initialReq);
+        fetchHeatFlow(initialReq);
+      }
+    }, 0);
+
+    return () => {
+      ignore = true;
+      clearTimeout(timer);
+    };
+  }, [fetchHeatFlow]);
 
   const handleApplyPreset = (presetId: string) => {
     const p = PRESET_OPTIONS.find((item) => item.id === presetId);
@@ -193,12 +194,12 @@ export default function HeatFlowPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* ── Top Navigation Bar ── */}
-      <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
+      <header className="sticky top-12 z-30 border-b border-border bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="flex items-center gap-1.5 rounded-none border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <ArrowLeft size={13} />
               <span>Back to Home</span>
@@ -226,10 +227,10 @@ export default function HeatFlowPage() {
               <button
                 key={p.id}
                 onClick={() => handleApplyPreset(p.id)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-none px-2.5 py-1 text-xs font-medium transition-colors ${
                   selectedPreset === p.id
                     ? "bg-accent text-accent-foreground shadow-sm"
-                    : "border border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 {p.id}
@@ -242,12 +243,12 @@ export default function HeatFlowPage() {
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         {/* ── Summary KPI Banner ── */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-rose-500/20 bg-card p-4 shadow-sm">
+          <div className="rounded-none border border-[#A63D2F]/30 bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-medium uppercase tracking-wider">Peak Heat Loss</span>
-              <Flame size={15} className="text-rose-400" />
+              <Flame size={15} className="text-[#A63D2F]" />
             </div>
-            <p className="mt-2 font-mono text-2xl font-bold text-rose-400">
+            <p className="mt-2 font-mono text-2xl font-bold text-[#A63D2F]">
               {data ? `${data.summary.peak_heat_loss_w.toLocaleString()} W` : "---"}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
@@ -255,10 +256,10 @@ export default function HeatFlowPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-none border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-medium uppercase tracking-wider">24h Total Loss</span>
-              <Zap size={15} className="text-amber-400" />
+              <Zap size={15} className="text-[#B87326]" />
             </div>
             <p className="mt-2 font-mono text-2xl font-bold text-foreground">
               {data ? `${data.summary.total_heat_loss_kwh} kWh` : "---"}
@@ -268,12 +269,12 @@ export default function HeatFlowPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-none border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-medium uppercase tracking-wider">Solar Passive Gain</span>
-              <Sun size={15} className="text-amber-400" />
+              <Sun size={15} className="text-[#B87326]" />
             </div>
-            <p className="mt-2 font-mono text-2xl font-bold text-amber-400">
+            <p className="mt-2 font-mono text-2xl font-bold text-[#B87326]">
               {data ? `${data.summary.total_solar_gain_kwh} kWh` : "---"}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
@@ -281,12 +282,12 @@ export default function HeatFlowPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-none border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-medium uppercase tracking-wider">Envelope U-Values</span>
-              <Layers size={15} className="text-sky-400" />
+              <Layers size={15} className="text-[#4A6D88]" />
             </div>
-            <p className="mt-2 font-mono text-2xl font-bold text-sky-400">
+            <p className="mt-2 font-mono text-2xl font-bold text-[#4A6D88]">
               {data ? `${data.u_values.u_wall} W/m²K` : "---"}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
@@ -309,7 +310,7 @@ export default function HeatFlowPage() {
                 wallMaterial={params.wall_material}
               />
             ) : (
-              <div className="flex h-[480px] w-full items-center justify-center rounded-xl border border-border bg-card">
+              <div className="flex h-[480px] w-full items-center justify-center rounded-none border border-border bg-card">
                 <Loader2 className="h-8 w-8 animate-spin text-accent" />
               </div>
             )}
@@ -323,7 +324,7 @@ export default function HeatFlowPage() {
 
             {/* Geometry Specification Card */}
             {data && (
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="rounded-none border border-border bg-card p-4 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-foreground">
                     Parametric Shelter Geometry (Derived from Volume)
@@ -333,35 +334,35 @@ export default function HeatFlowPage() {
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 font-mono text-xs">
-                  <div className="rounded-lg bg-muted/40 p-2">
+                  <div className="rounded-none bg-muted/40 p-2">
                     <span className="text-muted-foreground block text-[10px]">Width (W)</span>
                     <span className="font-bold text-foreground">{data.geometry.width_m} m</span>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-2">
+                  <div className="rounded-none bg-muted/40 p-2">
                     <span className="text-muted-foreground block text-[10px]">Length (L = 1.5W)</span>
                     <span className="font-bold text-foreground">{data.geometry.length_m} m</span>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-2">
+                  <div className="rounded-none bg-muted/40 p-2">
                     <span className="text-muted-foreground block text-[10px]">Wall Height</span>
                     <span className="font-bold text-foreground">{data.geometry.wall_height_m} m</span>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-2">
+                  <div className="rounded-none bg-muted/40 p-2">
                     <span className="text-muted-foreground block text-[10px]">Gable Roof Height</span>
                     <span className="font-bold text-foreground">{data.geometry.roof_height_m} m</span>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-2">
+                  <div className="rounded-none bg-muted/40 p-2">
                     <span className="text-muted-foreground block text-[10px]">Net Wall Area</span>
                     <span className="font-bold text-foreground">{data.geometry.wall_area_net_m2} m²</span>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-2">
+                  <div className="rounded-none bg-muted/40 p-2">
                     <span className="text-muted-foreground block text-[10px]">South Glazing Area</span>
                     <span className="font-bold text-foreground">{data.geometry.glazing_area_m2} m²</span>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-2">
+                  <div className="rounded-none bg-muted/40 p-2">
                     <span className="text-muted-foreground block text-[10px]">Roof Surface Area</span>
                     <span className="font-bold text-foreground">{data.geometry.roof_area_m2} m²</span>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-2">
+                  <div className="rounded-none bg-muted/40 p-2">
                     <span className="text-muted-foreground block text-[10px]">Floor Footprint</span>
                     <span className="font-bold text-foreground">{data.geometry.floor_area_m2} m²</span>
                   </div>
@@ -382,7 +383,7 @@ export default function HeatFlowPage() {
             )}
 
             {/* Building Envelope Input Parameters Form */}
-            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="rounded-none border border-border bg-card p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Sliders size={15} className="text-accent" />
@@ -407,7 +408,7 @@ export default function HeatFlowPage() {
                       step={5}
                       value={params.volume_m3}
                       onChange={(e) => handleParamChange("volume_m3", e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
+                      className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -419,7 +420,7 @@ export default function HeatFlowPage() {
                     <select
                       value={params.wall_material}
                       onChange={(e) => handleParamChange("wall_material", e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs focus:border-accent focus:outline-none"
+                      className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 text-xs focus:border-accent focus:outline-none"
                     >
                       <option value="Stone">Stone Masonry (k=1.8)</option>
                       <option value="Rammed_Earth">Rammed Earth (k=0.9)</option>
@@ -440,7 +441,7 @@ export default function HeatFlowPage() {
                       step={5}
                       value={params.wall_thickness_cm}
                       onChange={(e) => handleParamChange("wall_thickness_cm", e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
+                      className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -456,7 +457,7 @@ export default function HeatFlowPage() {
                       step={0.5}
                       value={params.insulation_r_value}
                       onChange={(e) => handleParamChange("insulation_r_value", e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
+                      className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -472,7 +473,7 @@ export default function HeatFlowPage() {
                       step={0.05}
                       value={params.glazing_ratio}
                       onChange={(e) => handleParamChange("glazing_ratio", e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
+                      className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -488,7 +489,7 @@ export default function HeatFlowPage() {
                       step={1}
                       value={params.occupancy}
                       onChange={(e) => handleParamChange("occupancy", e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
+                      className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -504,7 +505,7 @@ export default function HeatFlowPage() {
                       step={0.5}
                       value={params.heater_power_kw}
                       onChange={(e) => handleParamChange("heater_power_kw", e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
+                      className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -520,7 +521,7 @@ export default function HeatFlowPage() {
                       step={1}
                       value={params.ambient_temp_c ?? -6}
                       onChange={(e) => handleParamChange("ambient_temp_c", e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
+                      className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
                 </div>
@@ -529,7 +530,7 @@ export default function HeatFlowPage() {
                   id="btn-recalculate-heat-flow"
                   type="submit"
                   disabled={loading}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2 text-xs font-semibold text-accent-foreground shadow transition-colors hover:bg-accent/90 disabled:opacity-50"
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-none bg-accent py-2 text-xs font-semibold text-accent-foreground shadow transition-colors hover:bg-accent/90 disabled:opacity-50"
                 >
                   {loading ? (
                     <>
@@ -547,17 +548,17 @@ export default function HeatFlowPage() {
             </div>
 
             {/* Cross-Flow Navigation Cards */}
-            <div className="rounded-xl border border-border bg-muted/30 p-4">
+            <div className="rounded-none border border-border bg-card p-4">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Next Steps · Connected Flows
               </h4>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Link
                   href="/thermal-energy"
-                  className="flex items-center justify-between rounded-lg border border-border bg-card p-2.5 text-xs text-foreground transition-colors hover:border-accent"
+                  className="flex items-center justify-between rounded-none border border-border bg-background p-2.5 text-xs text-foreground transition-colors hover:border-accent"
                 >
                   <div className="flex items-center gap-2">
-                    <Zap size={14} className="text-amber-400" />
+                    <Zap size={14} className="text-[#B87326]" />
                     <span>Thermal Energy Flow</span>
                   </div>
                   <ArrowRight size={12} className="text-muted-foreground" />
@@ -565,10 +566,10 @@ export default function HeatFlowPage() {
 
                 <Link
                   href="/dashboard"
-                  className="flex items-center justify-between rounded-lg border border-border bg-card p-2.5 text-xs text-foreground transition-colors hover:border-accent"
+                  className="flex items-center justify-between rounded-none border border-border bg-background p-2.5 text-xs text-foreground transition-colors hover:border-accent"
                 >
                   <div className="flex items-center gap-2">
-                    <Sparkles size={14} className="text-sky-400" />
+                    <Sparkles size={14} className="text-[#4A6D88]" />
                     <span>Optimization Dashboard</span>
                   </div>
                   <ArrowRight size={12} className="text-muted-foreground" />

@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { jsPDF } from "jspdf"
@@ -22,11 +22,7 @@ import {
   Loader2,
   Sparkles,
   SlidersHorizontal,
-  CheckCircle2,
   ShieldCheck,
-  TrendingDown,
-  Building2,
-  Share2,
 } from "lucide-react"
 
 import {
@@ -53,82 +49,89 @@ const DEFAULT_DESIGN: ShelterDesign = {
 function DashboardContent() {
   const searchParams = useSearchParams()
 
-  const [location, setLocation] = useState("Leh")
-  const [outdoorTemp, setOutdoorTemp] = useState(-6.0)
-  const [design, setDesign] = useState<ShelterDesign>(DEFAULT_DESIGN)
+  const locParam = searchParams.get("location")
+  const tempParam = searchParams.get("outdoor_temp_c")
+  const matParam = searchParams.get("material") as ShelterDesign["material"] | null
+  const insParam = searchParams.get("insulation_mm")
+  const glzParam = searchParams.get("glazing") as ShelterDesign["glazing"] | null
+  const areaParam = searchParams.get("area_m2")
+
+  const initialLoc = locParam || "Leh"
+  const initialTemp = tempParam ? Number(tempParam) : -6.0
+  const initialDesign: ShelterDesign = useMemo(() => ({
+    material: matParam || DEFAULT_DESIGN.material,
+    insulation_mm: insParam ? Number(insParam) : DEFAULT_DESIGN.insulation_mm,
+    glazing: glzParam || DEFAULT_DESIGN.glazing,
+    area_m2: areaParam ? Number(areaParam) : DEFAULT_DESIGN.area_m2,
+  }), [matParam, insParam, glzParam, areaParam])
+
+  const [location, setLocation] = useState(initialLoc)
+  const [outdoorTemp, setOutdoorTemp] = useState(initialTemp)
+  const [design, setDesign] = useState<ShelterDesign>(initialDesign)
   const [result, setResult] = useState<DashboardResponse | null>(null)
   const [notice, setNotice] = useState("")
   const [loading, setLoading] = useState(false)
-  const [activePreset, setActivePreset] = useState<string>("Leh")
+  const [activePreset, setActivePreset] = useState<string>(
+    locParam && GOLDEN_PRESETS[locParam] ? locParam : "Leh"
+  )
 
-  // Chapter 3b: Ingest query parameters passed from /design or other flows
+  const runOptimizationDashboard = useCallback(
+    async (
+      loc = location,
+      temp = outdoorTemp,
+      currentDesign = design
+    ) => {
+      setLoading(true)
+      setNotice("")
+
+      const request: OptimizationRequest = {
+        location: loc,
+        outdoor_temp_c: temp,
+        solar_kwh_m2: GOLDEN_PRESETS[loc]?.climate.ghi_kwh_m2_day ?? 5.4,
+        occupants: 4,
+        target_temp_c: COMFORT_LOWER_BOUND_C,
+        population_size: 40,
+        generations: 30,
+        design: currentDesign,
+      }
+
+      try {
+        const response = await getDashboard(request)
+        setResult(response)
+      } catch {
+        // Chapter 3e Demo Hardening: Seamless client-side golden fallback
+        const fallbackPreset = GOLDEN_PRESETS[loc] || GOLDEN_PRESETS.Leh
+        setResult({
+          ...fallbackPreset.dashboardFallback,
+          baseline: {
+            ...fallbackPreset.dashboardFallback.baseline,
+            location: loc,
+            design: currentDesign,
+          },
+        })
+        setNotice(
+          "Operating in verified offline demo mode using pre-computed high-altitude Ladakhi validation dataset."
+        )
+      } finally {
+        setLoading(false)
+      }
+    },
+    [location, outdoorTemp, design]
+  )
+
+  // Chapter 3b: Ingest query parameters passed from /design or other flows on mount
   useEffect(() => {
-    const locParam = searchParams.get("location")
-    const tempParam = searchParams.get("outdoor_temp_c")
-    const matParam = searchParams.get("material") as ShelterDesign["material"] | null
-    const insParam = searchParams.get("insulation_mm")
-    const glzParam = searchParams.get("glazing") as ShelterDesign["glazing"] | null
-    const areaParam = searchParams.get("area_m2")
-
-    const nextLoc = locParam || "Leh"
-    const nextTemp = tempParam ? Number(tempParam) : -6.0
-    const nextDesign: ShelterDesign = {
-      material: matParam || DEFAULT_DESIGN.material,
-      insulation_mm: insParam ? Number(insParam) : DEFAULT_DESIGN.insulation_mm,
-      glazing: glzParam || DEFAULT_DESIGN.glazing,
-      area_m2: areaParam ? Number(areaParam) : DEFAULT_DESIGN.area_m2,
+    let ignore = false
+    const timer = setTimeout(() => {
+      if (!ignore) {
+        runOptimizationDashboard(initialLoc, initialTemp, initialDesign)
+      }
+    }, 0)
+    return () => {
+      ignore = true
+      clearTimeout(timer)
     }
-
-    setLocation(nextLoc)
-    setOutdoorTemp(nextTemp)
-    setDesign(nextDesign)
-    if (locParam && GOLDEN_PRESETS[locParam]) {
-      setActivePreset(locParam)
-    }
-
-    runOptimizationDashboard(nextLoc, nextTemp, nextDesign)
-  }, [searchParams])
-
-  async function runOptimizationDashboard(
-    loc = location,
-    temp = outdoorTemp,
-    currentDesign = design
-  ) {
-    setLoading(true)
-    setNotice("")
-
-    const request: OptimizationRequest = {
-      location: loc,
-      outdoor_temp_c: temp,
-      solar_kwh_m2: GOLDEN_PRESETS[loc]?.climate.ghi_kwh_m2_day ?? 5.4,
-      occupants: 4,
-      target_temp_c: COMFORT_LOWER_BOUND_C,
-      population_size: 40,
-      generations: 30,
-      design: currentDesign,
-    }
-
-    try {
-      const response = await getDashboard(request)
-      setResult(response)
-    } catch {
-      // Chapter 3e Demo Hardening: Seamless client-side golden fallback
-      const fallbackPreset = GOLDEN_PRESETS[loc] || GOLDEN_PRESETS.Leh
-      setResult({
-        ...fallbackPreset.dashboardFallback,
-        baseline: {
-          ...fallbackPreset.dashboardFallback.baseline,
-          location: loc,
-          design: currentDesign,
-        },
-      })
-      setNotice(
-        "Operating in verified offline demo mode using pre-computed high-altitude Ladakhi validation dataset."
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [runOptimizationDashboard, initialLoc, initialTemp, initialDesign])
 
   function applyPreset(key: keyof typeof GOLDEN_PRESETS) {
     const p = GOLDEN_PRESETS[key]
@@ -150,8 +153,8 @@ function DashboardContent() {
     const pdf = new jsPDF()
     const pageWidth = pdf.internal.pageSize.getWidth()
 
-    // Top Header Banner
-    pdf.setFillColor(20, 25, 35)
+    // Top Header Banner - Burnt Terracotta
+    pdf.setFillColor(182, 92, 56) // #B65C38
     pdf.rect(0, 0, pageWidth, 28, "F")
 
     pdf.setFont("helvetica", "bold")
@@ -161,7 +164,7 @@ function DashboardContent() {
 
     pdf.setFont("helvetica", "normal")
     pdf.setFontSize(8)
-    pdf.setTextColor(160, 175, 200)
+    pdf.setTextColor(246, 241, 231) // Warm cream subtext
     pdf.text(
       "Smart India Hackathon · Problem Statement 26051 · ML & NSGA-II Thermal Evaluation Report",
       14,
@@ -169,18 +172,18 @@ function DashboardContent() {
     )
 
     // Location & Environmental Context Box
-    pdf.setTextColor(20, 20, 20)
+    pdf.setTextColor(43, 38, 34) // #2B2622 Espresso
     pdf.setFont("helvetica", "bold")
     pdf.setFontSize(11)
     pdf.text("1. REGIONAL AND ENVELOPE BASELINE SPECIFICATION", 14, 38)
 
-    pdf.setDrawColor(200, 205, 215)
-    pdf.setFillColor(248, 250, 252)
+    pdf.setDrawColor(217, 208, 191) // #D9D0BF Warm Gray
+    pdf.setFillColor(250, 247, 242) // #FAF7F2 Warm Card Surface
     pdf.rect(14, 42, pageWidth - 28, 30, "FD")
 
     pdf.setFont("helvetica", "normal")
     pdf.setFontSize(9)
-    pdf.setTextColor(60, 70, 80)
+    pdf.setTextColor(104, 94, 85) // #685E55
     pdf.text(`Geographic Location: ${location} (High-Altitude Cold Arid)`, 18, 50)
     pdf.text(`Outdoor Ambient Temp: ${outdoorTemp}°C`, 18, 57)
     pdf.text(`Indoor Target Comfort: ${COMFORT_LOWER_BOUND_C.toFixed(1)}°C (${COMFORT_BASIS})`, 18, 64)
@@ -192,7 +195,7 @@ function DashboardContent() {
     // Thermal & Economic Performance Section
     pdf.setFont("helvetica", "bold")
     pdf.setFontSize(11)
-    pdf.setTextColor(20, 20, 20)
+    pdf.setTextColor(43, 38, 34)
     pdf.text("2. THERMAL PERFORMANCE & CAPITAL EXPENDITURE", 14, 82)
 
     const baseline = result.baseline
@@ -208,30 +211,30 @@ function DashboardContent() {
 
     statsData.forEach((stat, idx) => {
       const x = 14 + idx * (cardWidth + 3)
-      pdf.setFillColor(243, 246, 250)
-      pdf.setDrawColor(210, 215, 225)
+      pdf.setFillColor(250, 247, 242)
+      pdf.setDrawColor(217, 208, 191)
       pdf.rect(x, statsY, cardWidth, 22, "FD")
 
       pdf.setFont("helvetica", "normal")
       pdf.setFontSize(7.5)
-      pdf.setTextColor(100, 110, 120)
+      pdf.setTextColor(104, 94, 85)
       pdf.text(stat.label, x + 4, statsY + 7)
 
       pdf.setFont("helvetica", "bold")
       pdf.setFontSize(11)
-      pdf.setTextColor(20, 25, 35)
+      pdf.setTextColor(182, 92, 56) // Terracotta stat value
       pdf.text(stat.value, x + 4, statsY + 16)
     })
 
     // NSGA-II Pareto Optimization Section
     pdf.setFont("helvetica", "bold")
     pdf.setFontSize(11)
-    pdf.setTextColor(20, 20, 20)
+    pdf.setTextColor(43, 38, 34)
     pdf.text("3. NSGA-II MULTI-OBJECTIVE PARETO-OPTIMAL DESIGN FRONTIER", 14, 120)
 
     pdf.setFont("helvetica", "normal")
     pdf.setFontSize(8)
-    pdf.setTextColor(100, 110, 120)
+    pdf.setTextColor(104, 94, 85)
     pdf.text(
       "Non-dominated trade-offs balancing minimum heating demand (kWh) versus capital construction cost (₹):",
       14,
@@ -240,11 +243,12 @@ function DashboardContent() {
 
     // Table Header
     const tableY = 132
-    pdf.setFillColor(230, 235, 245)
-    pdf.rect(14, tableY, pageWidth - 28, 8, "F")
+    pdf.setFillColor(235, 228, 213) // #EBE4D5 Warm Sand
+    pdf.setDrawColor(217, 208, 191)
+    pdf.rect(14, tableY, pageWidth - 28, 8, "FD")
     pdf.setFont("helvetica", "bold")
     pdf.setFontSize(8)
-    pdf.setTextColor(40, 50, 60)
+    pdf.setTextColor(43, 38, 34)
     pdf.text("#", 18, tableY + 5.5)
     pdf.text("Material", 32, tableY + 5.5)
     pdf.text("Insulation", 75, tableY + 5.5)
@@ -257,12 +261,12 @@ function DashboardContent() {
     rows.forEach((p, idx) => {
       const y = tableY + 8 + idx * 8
       if (idx % 2 === 1) {
-        pdf.setFillColor(248, 250, 252)
+        pdf.setFillColor(246, 241, 231) // Warm cream alternating row
         pdf.rect(14, y, pageWidth - 28, 8, "F")
       }
       pdf.setFont("helvetica", "normal")
       pdf.setFontSize(8)
-      pdf.setTextColor(30, 35, 45)
+      pdf.setTextColor(43, 38, 34)
       pdf.text(String(idx + 1), 18, y + 5.5)
       pdf.text(p.design.material.toUpperCase(), 32, y + 5.5)
       pdf.text(`${p.design.insulation_mm} mm`, 75, y + 5.5)
@@ -274,7 +278,7 @@ function DashboardContent() {
     // Footer Watermark
     pdf.setFont("helvetica", "italic")
     pdf.setFontSize(8)
-    pdf.setTextColor(140, 150, 160)
+    pdf.setTextColor(104, 94, 85)
     pdf.text(
       `Generated by Ladakh Cold-Climate Shelter AI Engine · Verified Algorithm Output · ${new Date().toISOString().split("T")[0]}`,
       14,
@@ -531,22 +535,23 @@ function DashboardContent() {
                 <div className="mt-4 h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={result.baseline.indoor_temperature_24h}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#D9D0BF" opacity={0.7} />
                       <XAxis
                         dataKey="hour"
-                        stroke="rgba(255,255,255,0.4)"
+                        stroke="#685E55"
                         fontSize={11}
                         tickFormatter={(h) => `${h}:00`}
                       />
                       <YAxis
-                        stroke="rgba(255,255,255,0.4)"
+                        stroke="#685E55"
                         fontSize={11}
                         unit="°C"
                       />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: "#161b26",
-                          borderColor: "rgba(255,255,255,0.15)",
+                          backgroundColor: "#FAF7F2",
+                          borderColor: "#D9D0BF",
+                          color: "#2B2622",
                           borderRadius: 0,
                           fontSize: 12,
                         }}
@@ -554,7 +559,7 @@ function DashboardContent() {
                       <Line
                         type="monotone"
                         dataKey="outdoor"
-                        stroke="var(--warning, #f59e0b)"
+                        stroke="#4A6D88"
                         strokeWidth={2}
                         dot={false}
                         name="Outdoor °C"
@@ -562,7 +567,7 @@ function DashboardContent() {
                       <Line
                         type="monotone"
                         dataKey="indoor"
-                        stroke="var(--accent, #38bdf8)"
+                        stroke="#B65C38"
                         strokeWidth={2.5}
                         dot={false}
                         name="Indoor °C"
@@ -596,13 +601,13 @@ function DashboardContent() {
                     <ScatterChart
                       margin={{ top: 10, right: 20, bottom: 20, left: 10 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#D9D0BF" opacity={0.7} />
                       <XAxis
                         type="number"
                         dataKey="estimated_install_cost"
                         name="Install Cost"
                         unit="₹"
-                        stroke="rgba(255,255,255,0.4)"
+                        stroke="#685E55"
                         fontSize={11}
                       />
                       <YAxis
@@ -610,15 +615,16 @@ function DashboardContent() {
                         dataKey="daily_heating_kwh"
                         name="Heating Demand"
                         unit=" kWh"
-                        stroke="rgba(255,255,255,0.4)"
+                        stroke="#685E55"
                         fontSize={11}
                       />
                       <ZAxis range={[60, 60]} />
                       <Tooltip
                         cursor={{ strokeDasharray: "3 3" }}
                         contentStyle={{
-                          backgroundColor: "#161b26",
-                          borderColor: "rgba(255,255,255,0.15)",
+                          backgroundColor: "#FAF7F2",
+                          borderColor: "#D9D0BF",
+                          color: "#2B2622",
                           borderRadius: 0,
                           fontSize: 12,
                         }}
@@ -626,7 +632,7 @@ function DashboardContent() {
                       <Scatter
                         name="Pareto Solutions"
                         data={result.pareto_front}
-                        fill="var(--success, #22c55e)"
+                        fill="#3F6B4E"
                       />
                     </ScatterChart>
                   </ResponsiveContainer>

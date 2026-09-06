@@ -67,13 +67,13 @@ export function Shelter3DCanvas({
   };
 
   return (
-    <div className="relative h-[480px] w-full overflow-hidden rounded-xl border border-border bg-card shadow-lg sm:h-[540px]">
+    <div className="relative h-[480px] w-full overflow-hidden rounded-none border border-border bg-card shadow-sm sm:h-[540px]">
       {/* ── 3D Viewport Controls HUD ── */}
-      <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 p-1.5 backdrop-blur-md">
+      <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-1.5 rounded-none border border-border bg-card/90 p-1.5 backdrop-blur-md">
         <button
           id="btn-view-iso"
           onClick={() => setCameraView("iso")}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+          className="flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
           title="Isometric Perspective"
         >
           <Eye size={12} />
@@ -82,16 +82,16 @@ export function Shelter3DCanvas({
         <button
           id="btn-view-south"
           onClick={() => setCameraView("south")}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+          className="flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
           title="South Glazing Direct View (Solar Gain)"
         >
-          <Compass size={12} className="text-amber-400" />
+          <Compass size={12} className="text-[#B65C38]" />
           <span>South Glazing</span>
         </button>
         <button
           id="btn-view-top"
           onClick={() => setCameraView("top")}
-          className="rounded px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+          className="rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
           title="Top-down Site Plan"
         >
           Top
@@ -99,7 +99,7 @@ export function Shelter3DCanvas({
         <button
           id="btn-view-east"
           onClick={() => setCameraView("east")}
-          className="rounded px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+          className="rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
           title="East Gable Entry"
         >
           East
@@ -110,9 +110,9 @@ export function Shelter3DCanvas({
         <button
           id="btn-toggle-thermal"
           onClick={() => setShowThermalHeatmap(!showThermalHeatmap)}
-          className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+          className={`flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium transition-colors ${
             showThermalHeatmap
-              ? "bg-rose-500/20 text-rose-300 hover:bg-rose-500/30"
+              ? "bg-[#A63D2F]/15 text-[#A63D2F] hover:bg-[#A63D2F]/25"
               : "text-muted-foreground hover:bg-muted"
           }`}
           title="Toggle Thermal Heat-Loss Radiation Effect"
@@ -123,7 +123,7 @@ export function Shelter3DCanvas({
         <button
           id="btn-toggle-wireframe"
           onClick={() => setWireframe(!wireframe)}
-          className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+          className={`flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium transition-colors ${
             wireframe
               ? "bg-accent/20 text-accent hover:bg-accent/30"
               : "text-muted-foreground hover:bg-muted"
@@ -136,12 +136,12 @@ export function Shelter3DCanvas({
       </div>
 
       {/* ── Solar & Heat Loss Status Badge ── */}
-      <div className="absolute right-3 top-3 z-10 flex flex-col items-end gap-1 rounded-lg border border-border/60 bg-background/85 px-3 py-2 text-right backdrop-blur-md">
+      <div className="absolute right-3 top-3 z-10 flex flex-col items-end gap-1 rounded-none border border-border bg-card/90 px-3 py-2 text-right backdrop-blur-md">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Heat Loss Rate
           </span>
-          <span className="font-mono text-sm font-bold text-rose-400">
+          <span className="font-mono text-sm font-bold text-[#A63D2F]">
             {currentPoint.q_total_w.toLocaleString()} W
           </span>
         </div>
@@ -153,10 +153,10 @@ export function Shelter3DCanvas({
       </div>
 
       {/* ── Orientation Guide (Compass) ── */}
-      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-md border border-border/40 bg-background/80 px-2.5 py-1 text-[11px] font-mono text-muted-foreground backdrop-blur-sm">
-        <span className="text-sky-400 font-bold">▲ North (-Z)</span>
+      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-none border border-border bg-card/90 px-2.5 py-1 text-[11px] font-mono text-muted-foreground backdrop-blur-sm">
+        <span className="text-[#4A6D88] font-bold">▲ North (-Z)</span>
         <span>·</span>
-        <span className="text-amber-400 font-bold">▼ South / Solar Gain (+Z)</span>
+        <span className="text-[#B65C38] font-bold">▼ South / Solar Gain (+Z)</span>
       </div>
 
       {/* ── 3D Canvas ── */}

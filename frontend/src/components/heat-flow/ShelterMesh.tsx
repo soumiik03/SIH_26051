@@ -16,7 +16,6 @@ interface ShelterMeshProps {
 
 export function ShelterMesh({
   geometry,
-  uValues,
   currentPoint,
   wallMaterial,
   wireframe = false,
