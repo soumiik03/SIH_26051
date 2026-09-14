@@ -477,7 +477,7 @@ export default function IndoorTemperaturePage() {
                       <Field label="Thermal Mass (MJ/m³·K)" required>
                         <Input
                           type="number"
-                          step="0.1"
+                          step="any"
                           className="font-mono text-sm"
                           value={form.thermal_mass_MJ_m3K}
                           onChange={(e) => updateField("thermal_mass_MJ_m3K", e.target.value)}
@@ -486,7 +486,7 @@ export default function IndoorTemperaturePage() {
                       <Field label="Insulation R-Value (m²K/W)" required>
                         <Input
                           type="number"
-                          step="0.1"
+                          step="any"
                           className="font-mono text-sm"
                           value={form.insulation_r_value_m2K_W}
                           onChange={(e) => updateField("insulation_r_value_m2K_W", e.target.value)}
@@ -495,7 +495,7 @@ export default function IndoorTemperaturePage() {
                       <Field label="Glazing Ratio (0.0 - 1.0)" required>
                         <Input
                           type="number"
-                          step="0.01"
+                          step="any"
                           min="0"
                           max="1"
                           className="font-mono text-sm"

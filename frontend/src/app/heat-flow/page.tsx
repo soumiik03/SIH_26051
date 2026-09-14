@@ -438,7 +438,7 @@ export default function HeatFlowPage() {
                       type="number"
                       min={20}
                       max={500}
-                      step={5}
+                      step="any"
                       value={params.volume_m3}
                       onChange={(e) => handleParamChange("volume_m3", e.target.value)}
                       className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
@@ -476,7 +476,7 @@ export default function HeatFlowPage() {
                       type="number"
                       min={10}
                       max={100}
-                      step={5}
+                      step="any"
                       value={params.wall_thickness_cm}
                       onChange={(e) => handleParamChange("wall_thickness_cm", e.target.value)}
                       className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
@@ -492,7 +492,7 @@ export default function HeatFlowPage() {
                       type="number"
                       min={0}
                       max={10}
-                      step={0.5}
+                      step="any"
                       value={params.insulation_r_value}
                       onChange={(e) => handleParamChange("insulation_r_value", e.target.value)}
                       className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
@@ -508,7 +508,7 @@ export default function HeatFlowPage() {
                       type="number"
                       min={0.05}
                       max={0.8}
-                      step={0.05}
+                      step="any"
                       value={params.glazing_ratio}
                       onChange={(e) => handleParamChange("glazing_ratio", e.target.value)}
                       className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
@@ -524,7 +524,7 @@ export default function HeatFlowPage() {
                       type="number"
                       min={0}
                       max={20}
-                      step={1}
+                      step="any"
                       value={params.occupancy}
                       onChange={(e) => handleParamChange("occupancy", e.target.value)}
                       className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
@@ -540,7 +540,7 @@ export default function HeatFlowPage() {
                       type="number"
                       min={0}
                       max={10}
-                      step={0.5}
+                      step="any"
                       value={params.heater_power_kw}
                       onChange={(e) => handleParamChange("heater_power_kw", e.target.value)}
                       className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"
@@ -556,7 +556,7 @@ export default function HeatFlowPage() {
                       type="number"
                       min={-40}
                       max={35}
-                      step={1}
+                      step="any"
                       value={params.ambient_temp_c ?? -6}
                       onChange={(e) => handleParamChange("ambient_temp_c", e.target.value)}
                       className="mt-1 w-full rounded-none border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs focus:border-accent focus:outline-none"

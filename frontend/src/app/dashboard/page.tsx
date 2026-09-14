@@ -657,7 +657,7 @@ function DashboardContent() {
                   type="number"
                   min="0"
                   max="250"
-                  step="10"
+                  step="any"
                   className="mt-1 font-mono text-xs"
                   value={design.insulation_mm}
                   onChange={(e) =>

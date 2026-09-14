@@ -470,7 +470,7 @@ export default function ThermalEnergyPage() {
                       <Field label="Glazing Ratio" required>
                         <Input
                           type="number"
-                          step="0.01"
+                          step="any"
                           min="0"
                           max="1"
                           className="font-mono text-sm"
