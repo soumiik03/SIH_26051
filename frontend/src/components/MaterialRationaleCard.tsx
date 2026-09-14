@@ -51,7 +51,7 @@ export function MaterialRationaleCard({
           </h3>
         </div>
         <Badge variant="input" className="font-mono text-[11px] font-semibold text-foreground">
-          {matDef.displayName} ({material})
+          {matDef.displayName}
         </Badge>
       </div>
 

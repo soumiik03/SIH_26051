@@ -24,6 +24,7 @@ import { Dynamic3DView } from "@/components/heat-flow/Dynamic3DView"
 import { MaterialRationaleCard } from "@/components/MaterialRationaleCard"
 import { generateClientFallback } from "@/lib/api/heat-flow"
 import { getMaterialCatalog, type MaterialCatalog } from "@/lib/api/materials"
+import { WALL_MATERIALS } from "@/lib/materials"
 
 type FormState = {
   latitude: string
@@ -611,7 +612,9 @@ export default function DesignPage() {
                           Recommended Classification
                         </p>
                         <p className="mt-1 font-mono text-sm font-semibold text-foreground">
-                          {prediction.material_name ?? `Design profile class ${prediction.material_class}`}
+                          {prediction.material_name
+                            ? (WALL_MATERIALS[prediction.material_name]?.displayName ?? prediction.material_name.replace(/_/g, " "))
+                            : `Design profile class ${prediction.material_class}`}
                         </p>
                       </div>
                     </div>
@@ -770,7 +773,7 @@ export default function DesignPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="input" className="font-mono text-[11px]">
-                      100 m³ · {prediction.material_name ?? "Rammed_Earth"}
+                      100 m³ · {prediction.material_name ? (WALL_MATERIALS[prediction.material_name]?.displayName ?? prediction.material_name.replace(/_/g, " ")) : "Rammed Earth"}
                     </Badge>
                     <Badge variant="output" className="font-mono text-[11px]">
                       {embeddedPreview.geometry.length_m}m(L) × {embeddedPreview.geometry.width_m}m(W) × {embeddedPreview.geometry.wall_height_m}m(H)

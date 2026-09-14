@@ -551,7 +551,7 @@ export default function ThermalEnergyPage() {
                     </div>
                     <div className="flex items-center justify-between p-3 text-xs">
                       <span className="text-muted-foreground">Selected Wall Material</span>
-                      <span className="font-mono font-bold text-accent">{form.wall_material}</span>
+                      <span className="font-mono font-bold text-accent">{form.wall_material.replace(/_/g, " ")}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 text-xs">
                       <span className="text-muted-foreground">Wall Thickness</span>
