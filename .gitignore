@@ -8,6 +8,8 @@ node_modules/
 out/
 build/
 dist/
+*.tsbuildinfo
+next-env.d.ts
 
 # Python & Virtual Environments
 __pycache__/
@@ -21,22 +23,33 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.pytest_cache/
+*/.pytest_cache/
+.ipynb_checkpoints/
 
-# Machine Learning Artifacts & Pickles
+# Machine Learning Artifacts & Pickles (general ignores)
 *.pkl
 *.joblib
 *.h5
 *.onnx
 
-# Environment Variables
+# Explicitly track backend production ML models and metadata
+!backend/models/*.joblib
+!backend/models/metadata.json
+!backend/models/.gitkeep
+
+# Environment Variables & Secrets
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 backend/.env
+frontend/.env.local
+
+# Preserve template files
 !.env*.example
 !.env.example
+!frontend/.env*.example
+!backend/.env*.example
 
 # Logs
 npm-debug.log*

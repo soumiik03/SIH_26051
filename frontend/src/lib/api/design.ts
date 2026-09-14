@@ -1,7 +1,12 @@
 import { ApiError, type DesignPredictionRequest, type DesignPredictionResponse } from "@/lib/api"
 import type { WallMaterial } from "@/lib/materials"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000"
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL !== undefined
+    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")
+    : typeof window !== "undefined"
+    ? ""
+    : "http://127.0.0.1:8000";
 
 export type DesignResult = {
   status: string

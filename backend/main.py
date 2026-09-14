@@ -62,12 +62,14 @@ app = FastAPI(
 )
 
 # CORS configuration
-frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-origins = [
-    frontend_url,
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+raw_frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000,http://127.0.0.1:3000")
+if raw_frontend_url.strip() == "*":
+    origins = ["*"]
+else:
+    configured_origins = [url.strip() for url in raw_frontend_url.split(",") if url.strip()]
+    default_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Preserve unique order
+    origins = list(dict.fromkeys(configured_origins + default_origins))
 
 app.add_middleware(
     CORSMiddleware,
@@ -80,12 +82,14 @@ app.add_middleware(
 
 # Health endpoint
 @app.get("/health", tags=["System"])
+@app.get("/api/health", tags=["System"])
 def health_check():
     ready = model_loader.is_ready()
     return {"status": "ok" if ready else "degraded", "models_loaded": ready}
 
 
 @app.get("/climate", tags=["Climate Data"])
+@app.get("/api/climate", tags=["Climate Data"])
 def climate_data(latitude: float, longitude: float, start: str | None = None, end: str | None = None):
     """Return cached/retrieved NASA POWER climate values for a location."""
     from datetime import date
@@ -103,6 +107,7 @@ def climate_data(latitude: float, longitude: float, start: str | None = None, en
 
 
 @app.get("/materials", tags=["Material Data"])
+@app.get("/api/materials", tags=["Material Data"])
 def material_catalog():
     """Expose the canonical material values used by physics and optimization."""
     return {
@@ -115,12 +120,10 @@ def material_catalog():
         for name in ("Concrete", "Mud_Brick", "Rammed_Earth", "Stone")
     }
 
-# Mount prediction routers
-app.include_router(indoor_temp.router)
-app.include_router(design.router)
-app.include_router(thermal_energy.router)
-app.include_router(optimization.router)
-app.include_router(heat_flow.router)
+# Mount prediction routers (supporting both root and /api prefixed routes)
+for r in (indoor_temp.router, design.router, thermal_energy.router, optimization.router, heat_flow.router):
+    app.include_router(r)
+    app.include_router(r, prefix="/api")
 
 
 if __name__ == "__main__":

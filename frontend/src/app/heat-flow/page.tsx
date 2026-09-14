@@ -195,7 +195,18 @@ export default function HeatFlowPage() {
                 Heat Flow &amp; 3D Shelter Visualizer
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-                Building envelope conduction ($Q = U \cdot A \cdot \Delta T$) and real-sun diurnal tracking across vernacular building envelopes.
+                Building envelope conduction{" "}
+                <span className="inline-flex items-center gap-1 rounded-sm border border-border/80 bg-muted/60 px-2 py-0.5 font-mono text-xs font-medium text-foreground">
+                  <span className="font-serif italic text-[13px]">Q</span>
+                  <span>=</span>
+                  <span className="font-serif italic text-[13px]">U</span>
+                  <span>·</span>
+                  <span className="font-serif italic text-[13px]">A</span>
+                  <span>·</span>
+                  <span>Δ</span>
+                  <span className="font-serif italic text-[13px]">T</span>
+                </span>{" "}
+                and real-sun diurnal tracking across vernacular building envelopes.
               </p>
             </div>
 

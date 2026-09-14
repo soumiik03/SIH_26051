@@ -137,3 +137,26 @@ The frontend will be accessible at [http://localhost:3000](http://localhost:3000
 - **Corners**: Sharp aesthetics (`rounded-none` / `rounded-sm`).
 - **Typography**: Clean sans body with `JetBrains Mono` for numeric metrics and telemetry values.
 - **Semantic Colors**: Tailwind tokens for `success`, `warning`, `danger`, and `accent`.
+
+---
+
+## Deployment Guide
+
+### Deploying the Backend (FastAPI on Render / Railway / Docker)
+
+1. **Root directory**: Set root directory to `backend` (or deploy from repository root with `uvicorn backend.main:app`).
+2. **Build Command**: `pip install -r requirements.txt`
+3. **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+4. **Environment Variables**:
+   - `PORT`: Set automatically by cloud host (or default `8000`)
+   - `HOST`: `0.0.0.0`
+   - `FRONTEND_URL`: URL of your deployed frontend (e.g. `https://your-frontend.vercel.app`)
+
+### Deploying the Frontend (Next.js on Vercel)
+
+1. **Root directory**: Set root directory to `frontend`.
+2. **Framework Preset**: Next.js (detected automatically).
+3. **Environment Variables**:
+   - `NEXT_PUBLIC_API_URL`: Your deployed FastAPI backend URL (e.g. `https://your-backend.onrender.com`).
+   - `NEXT_PUBLIC_APP_URL`: Your production frontend domain (e.g. `https://your-frontend.vercel.app`).
+

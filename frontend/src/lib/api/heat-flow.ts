@@ -5,7 +5,11 @@
 import { getWallMaterialDefinition } from "@/lib/materials";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL !== undefined
+    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")
+    : typeof window !== "undefined"
+    ? ""
+    : "http://127.0.0.1:8000";
 
 export interface HeatFlowRequest {
   latitude: number;

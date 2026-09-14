@@ -73,128 +73,130 @@ export function Shelter3DCanvas({
 
   return (
     <div className={`relative w-full overflow-hidden rounded-none border border-border bg-card shadow-sm ${className ?? "h-[480px] sm:h-[540px]"}`}>
-      {/* ── 3D Viewport Controls HUD ── */}
-      <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-1.5 rounded-none border border-border bg-card/90 p-1.5 backdrop-blur-md">
-        <button
-          id="btn-view-iso"
-          onClick={() => setCameraView("iso")}
-          className="flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-          title="Isometric Perspective"
-        >
-          <Eye size={12} />
-          <span>Iso</span>
-        </button>
-        <button
-          id="btn-view-south"
-          onClick={() => setCameraView("south")}
-          className="flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-          title="South Glazing Direct View (Solar Gain)"
-        >
-          <Compass size={12} className="text-[#B65C38]" />
-          <span>South Glazing</span>
-        </button>
-        <button
-          id="btn-view-top"
-          onClick={() => setCameraView("top")}
-          className="rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-          title="Top-down Site Plan"
-        >
-          Top
-        </button>
-        <button
-          id="btn-view-east"
-          onClick={() => setCameraView("east")}
-          className="rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-          title="East Vernacular Entry"
-        >
-          East
-        </button>
+      {/* ── Top Floating Overlay Bar (Responsive flex container) ── */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-2.5 sm:flex-row sm:items-start sm:justify-between sm:p-3">
+        {/* Left: Viewport Controls */}
+        <div className="pointer-events-auto flex flex-wrap items-center gap-1 rounded-none border border-border/90 bg-card/95 p-1 shadow-sm backdrop-blur-md">
+          <button
+            id="btn-view-iso"
+            onClick={() => setCameraView("iso")}
+            className="flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+            title="Isometric Perspective"
+          >
+            <Eye size={12} />
+            <span>Iso</span>
+          </button>
+          <button
+            id="btn-view-south"
+            onClick={() => setCameraView("south")}
+            className="flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+            title="South Glazing Direct View (Solar Gain)"
+          >
+            <Compass size={12} className="text-[#B65C38]" />
+            <span>South</span>
+          </button>
+          <button
+            id="btn-view-top"
+            onClick={() => setCameraView("top")}
+            className="rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+            title="Top-down Site Plan"
+          >
+            Top
+          </button>
+          <button
+            id="btn-view-east"
+            onClick={() => setCameraView("east")}
+            className="rounded-none px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+            title="East Vernacular Entry"
+          >
+            East
+          </button>
 
-        <div className="mx-1 h-3.5 w-[1px] bg-border" />
+          <div className="mx-0.5 h-3.5 w-[1px] bg-border" />
 
-        <button
-          id="btn-toggle-thermal"
-          onClick={() => setShowThermalHeatmap(!showThermalHeatmap)}
-          className={`flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium transition-colors ${
-            showThermalHeatmap
-              ? "bg-[#A63D2F]/15 text-[#A63D2F] hover:bg-[#A63D2F]/25"
-              : "text-muted-foreground hover:bg-muted"
-          }`}
-          title="Toggle Thermal Heat-Loss Radiation Effect"
-        >
-          <Sparkles size={12} />
-          <span>Heat Loss Glow</span>
-        </button>
-        <button
-          id="btn-toggle-wireframe"
-          onClick={() => setWireframe(!wireframe)}
-          className={`flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium transition-colors ${
-            wireframe
-              ? "bg-accent/20 text-accent hover:bg-accent/30"
-              : "text-muted-foreground hover:bg-muted"
-          }`}
-          title="Toggle Geometry Wireframe"
-        >
-          <Layers size={12} />
-          <span>Wireframe</span>
-        </button>
-        <button
-          id="btn-toggle-dimensions"
-          onClick={() => setShowDimensions(!showDimensions)}
-          className={`flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium transition-colors ${
-            showDimensions
-              ? "bg-[#B87326]/15 text-[#8B5A16] hover:bg-[#B87326]/25"
-              : "text-muted-foreground hover:bg-muted"
-          }`}
-          title="Toggle real-world dimensions and architectural scale"
-        >
-          <Ruler size={12} />
-          <span>Dimensions</span>
-        </button>
+          <button
+            id="btn-toggle-thermal"
+            onClick={() => setShowThermalHeatmap(!showThermalHeatmap)}
+            className={`flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium transition-colors ${
+              showThermalHeatmap
+                ? "bg-[#A63D2F]/15 text-[#A63D2F] hover:bg-[#A63D2F]/25"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+            title="Toggle Thermal Heat-Loss Radiation Effect"
+          >
+            <Sparkles size={12} />
+            <span className="hidden sm:inline">Heat Loss</span>
+            <span>Glow</span>
+          </button>
+          <button
+            id="btn-toggle-wireframe"
+            onClick={() => setWireframe(!wireframe)}
+            className={`flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium transition-colors ${
+              wireframe
+                ? "bg-accent/20 text-accent hover:bg-accent/30"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+            title="Toggle Geometry Wireframe"
+          >
+            <Layers size={12} />
+            <span className="hidden sm:inline">Wireframe</span>
+          </button>
+          <button
+            id="btn-toggle-dimensions"
+            onClick={() => setShowDimensions(!showDimensions)}
+            className={`flex items-center gap-1 rounded-none px-2 py-1 text-xs font-medium transition-colors ${
+              showDimensions
+                ? "bg-[#B87326]/15 text-[#8B5A16] hover:bg-[#B87326]/25"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+            title="Toggle real-world dimensions and architectural scale"
+          >
+            <Ruler size={12} />
+            <span className="hidden sm:inline">Dimensions</span>
+          </button>
+        </div>
+
+        {/* Right: Solar & Heat Loss Status Badge */}
+        <div className="pointer-events-auto flex shrink-0 items-center justify-between gap-3 rounded-none border border-border/90 bg-card/95 px-3 py-1.5 shadow-sm backdrop-blur-md sm:flex-col sm:items-end sm:gap-0.5 sm:py-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Heat Loss Rate
+            </span>
+            <span className="font-mono text-sm font-bold text-[#A63D2F]">
+              {currentPoint.q_total_w.toLocaleString()} W
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+            <span>Sun: <strong className="text-foreground">{currentPoint.sun_elevation_deg.toFixed(1)}°</strong></span>
+            <span>·</span>
+            <span>Az: <strong className="text-foreground">{currentPoint.sun_azimuth_deg.toFixed(1)}°</strong></span>
+          </div>
+        </div>
       </div>
 
-      {/* ── Solar & Heat Loss Status Badge ── */}
-      <div className="absolute right-3 top-3 z-10 flex flex-col items-end gap-1 rounded-none border border-border bg-card/90 px-3 py-2 text-right backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Heat Loss Rate
-          </span>
-          <span className="font-mono text-sm font-bold text-[#A63D2F]">
-            {currentPoint.q_total_w.toLocaleString()} W
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Sun Elev: <strong className="text-foreground">{currentPoint.sun_elevation_deg}°</strong></span>
+      {/* ── Bottom Floating Info Bar (Compass & Scale HUD) ── */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-start justify-between gap-1.5 p-2.5 sm:flex-row sm:items-end sm:p-3">
+        {/* Orientation Guide (Compass) */}
+        <div className="pointer-events-auto flex items-center gap-2 rounded-none border border-border/90 bg-card/95 px-2.5 py-1 text-[11px] font-mono text-muted-foreground shadow-sm backdrop-blur-sm">
+          <span className="text-[#4A6D88] font-bold">▲ North (-Z)</span>
           <span>·</span>
-          <span>Azimuth: <strong className="text-foreground">{currentPoint.sun_azimuth_deg}°</strong></span>
+          <span className="text-[#B65C38] font-bold">▼ South (+Z)</span>
         </div>
-      </div>
 
-      <div className="absolute left-3 top-14 z-10 rounded-none border border-border bg-card/85 px-2.5 py-1 text-[10px] font-mono text-muted-foreground backdrop-blur-sm">
-        Roof finish: separate slate/timber-style finish
-      </div>
-
-      {/* ── Orientation Guide (Compass) ── */}
-      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-none border border-border bg-card/90 px-2.5 py-1 text-[11px] font-mono text-muted-foreground backdrop-blur-sm">
-        <span className="text-[#4A6D88] font-bold">▲ North (-Z)</span>
-        <span>·</span>
-        <span className="text-[#B65C38] font-bold">▼ South / Solar Gain (+Z)</span>
-      </div>
-
-      {/* ── Metric Real Scale Reference Badge (HUD) ── */}
-      <div
-        id="scale-reference-hud"
-        className="absolute bottom-3 right-3 z-10 flex items-center gap-2 rounded-none border border-border bg-card/90 px-2.5 py-1 text-[11px] font-mono text-muted-foreground backdrop-blur-sm"
-      >
-        <Ruler size={12} className="text-accent" />
-        <span className="font-semibold text-foreground">Grid: 1m × 1m</span>
-        <span>·</span>
+        {/* Metric Real Scale Reference Badge (HUD) */}
+        <div
+          id="scale-reference-hud"
+          className="pointer-events-auto flex items-center gap-2 rounded-none border border-border/90 bg-card/95 px-2.5 py-1 text-[11px] font-mono text-muted-foreground shadow-sm backdrop-blur-sm"
+        >
+          <Ruler size={12} className="text-accent" />
+          <span className="font-semibold text-foreground">Grid: 1m</span>
+          <span>·</span>
           <span className="font-semibold text-accent">Scale: 1:100</span>
-          <span className="hidden text-foreground sm:inline">1 mm = 10 cm</span>
-        <span className="hidden sm:inline">·</span>
-        <span className="hidden text-foreground sm:inline">
-          {geometry.length_m}m(L) × {geometry.width_m}m(W) × {geometry.wall_height_m}m(H)
-        </span>
+          <span>·</span>
+          <span className="text-foreground">
+            {geometry.length_m}m(L) × {geometry.width_m}m(W) × {geometry.wall_height_m}m(H)
+          </span>
+        </div>
       </div>
 
       {/* ── 3D Canvas ── */}
@@ -422,60 +424,7 @@ function ProfessionalDimensionAnnotations({ geometry }: { geometry: ShelterGeome
 
   return (
     <group>
-      <DimensionLine
-        start={[-L / 2, 0.08, southZ]}
-        end={[L / 2, 0.08, southZ]}
-        label={`${L.toFixed(2)} m`}
-        labelPosition={[0, 0.12, southZ + 0.12]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        tickDirection="z"
-        color={color}
-      />
-      <DimensionLine
-        start={[eastX, 0.08, -W / 2]}
-        end={[eastX, 0.08, W / 2]}
-        label={`${W.toFixed(2)} m`}
-        labelPosition={[eastX + 0.12, 0.12, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        tickDirection="x"
-        color={color}
-      />
-      <Line
-        points={[
-          [-L / 2 - 0.65, 0.08, W / 2 + 0.2],
-          [-L / 2 - 0.65, H, W / 2 + 0.2],
-        ]}
-        color={color}
-        lineWidth={1.5}
-      />
-      <Html position={[-L / 2 - 0.9, H / 2, W / 2 + 0.2]} center distanceFactor={7}>
-        <div className="pointer-events-none whitespace-nowrap border border-[#fff4dc]/80 bg-[#241b14]/90 px-2 py-1 text-[10px] font-mono font-semibold text-[#fff4dc] shadow-lg">
-          {H.toFixed(2)} m H
-        </div>
-      </Html>
-      {false && <Html position={[0, H + 0.8, 0]} center distanceFactor={7}>
-        <div className="pointer-events-none whitespace-nowrap border border-[#f0c98a]/70 bg-[#241b14]/90 px-2 py-1 text-[10px] font-mono font-semibold text-[#ffe8b5] shadow-lg">
-          Drawing scale: 1:100&nbsp; · &nbsp;1 mm = 10 cm
-        </div>
-      </Html>}
-    </group>
-  );
-}
-
-function DimensionAnnotations({ geometry }: { geometry: ShelterGeometry }) {
-  const L = geometry.length_m;
-  const W = geometry.width_m;
-  const H = geometry.wall_height_m;
-  const lineColor = "#f8e7c1";
-  const guideColor = "#d6a15b";
-  const southZ = W / 2 + 0.95;
-  const northZ = -W / 2 - 0.95;
-  const eastX = L / 2 + 0.95;
-  const westX = -L / 2 - 0.95;
-
-  return (
-    <group>
-      {/* South/front length */}
+      {/* South Length Dimension */}
       <DimensionLine
         start={[-L / 2, 0.08, southZ]}
         end={[L / 2, 0.08, southZ]}
@@ -483,19 +432,9 @@ function DimensionAnnotations({ geometry }: { geometry: ShelterGeometry }) {
         labelPosition={[0, 0.12, southZ + 0.18]}
         rotation={[-Math.PI / 2, 0, 0]}
         tickDirection="z"
-        color={lineColor}
+        color={color}
       />
-      {/* North/rear length */}
-      <DimensionLine
-        start={[-L / 2, 0.08, northZ]}
-        end={[L / 2, 0.08, northZ]}
-        label={`${L.toFixed(2)} m`}
-        labelPosition={[0, 0.12, northZ - 0.18]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        tickDirection="z"
-        color={guideColor}
-      />
-      {/* East/right width */}
+      {/* East Width Dimension */}
       <DimensionLine
         start={[eastX, 0.08, -W / 2]}
         end={[eastX, 0.08, W / 2]}
@@ -503,70 +442,43 @@ function DimensionAnnotations({ geometry }: { geometry: ShelterGeometry }) {
         labelPosition={[eastX + 0.18, 0.12, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         tickDirection="x"
-        color={lineColor}
+        color={color}
       />
-      {/* West/left width */}
-      <DimensionLine
-        start={[westX, 0.08, -W / 2]}
-        end={[westX, 0.08, W / 2]}
-        label={`${W.toFixed(2)} m`}
-        labelPosition={[westX - 0.18, 0.12, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        tickDirection="x"
-        color={guideColor}
-      />
-      {/* Front-left vertical height */}
+      {/* Vertical Height Dimension Line */}
       <Line
-        points={[[-L / 2 - 0.85, 0.08, W / 2 + 0.35], [-L / 2 - 0.85, H, W / 2 + 0.35]]}
-        color={lineColor}
+        points={[
+          [-L / 2 - 0.75, 0.08, W / 2 + 0.25],
+          [-L / 2 - 0.75, H, W / 2 + 0.25],
+        ]}
+        color={color}
         lineWidth={1.5}
       />
       <Line
         points={[
-          [-L / 2 - 1.05, 0.08, W / 2 + 0.35],
-          [-L / 2 - 0.65, 0.08, W / 2 + 0.35],
-          [-L / 2 - 0.85, 0.08, W / 2 + 0.35],
+          [-L / 2 - 0.95, 0.08, W / 2 + 0.25],
+          [-L / 2 - 0.55, 0.08, W / 2 + 0.25],
         ]}
-        color={lineColor}
+        color={color}
         lineWidth={1.5}
       />
       <Line
         points={[
-          [-L / 2 - 1.05, H, W / 2 + 0.35],
-          [-L / 2 - 0.65, H, W / 2 + 0.35],
-          [-L / 2 - 0.85, H, W / 2 + 0.35],
+          [-L / 2 - 0.95, H, W / 2 + 0.25],
+          [-L / 2 - 0.55, H, W / 2 + 0.25],
         ]}
-        color={lineColor}
+        color={color}
         lineWidth={1.5}
       />
       <Text
-        position={[-L / 2 - 1.15, H / 2, W / 2 + 0.35]}
+        position={[-L / 2 - 1.15, H / 2, W / 2 + 0.25]}
         fontSize={0.28}
-        color={lineColor}
+        color={color}
         anchorX="center"
         anchorY="middle"
-        rotation={[0, Math.PI / 2, 0]}
+        rotation={[0, Math.PI / 4, 0]}
       >
         {`${H.toFixed(2)} m H`}
       </Text>
-
-      {/* Scale plate is deliberately repeated in-world, close to the model. */}
-      <group position={[0, 0.12, southZ + 0.85]}>
-        <mesh rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[3.8, 0.5]} />
-          <meshBasicMaterial color="#201812" transparent opacity={0.82} />
-        </mesh>
-        <Text
-          position={[0, 0.02, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.25}
-          color="#ffe6b0"
-          anchorX="center"
-          anchorY="middle"
-        >
-          SCALE 1:100  |  1 mm = 10 cm
-        </Text>
-      </group>
     </group>
   );
 }
